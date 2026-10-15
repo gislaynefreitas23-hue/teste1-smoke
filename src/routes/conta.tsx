@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link, navigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { LogOut, Trash2 } from "lucide-react";
 
@@ -39,6 +39,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 function Conta() {
   const { session, loading } = useAuthSession();
+  const nav = useNavigate();
   const userId = session?.user.id;
 
   const { data: orders = [] } = useQuery({
@@ -112,6 +113,7 @@ function Conta() {
 
   async function saveProfile(event: React.FormEvent) {
     event.preventDefault();
+    if (!userId) return;
     const { error } = await supabase
       .from("profiles")
       .upsert({ id: userId, name, preferences });
@@ -120,7 +122,7 @@ function Conta() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    navigate({ to: "/" });
+    nav({ to: "/" });
   }
 
   async function requestDeletion() {
@@ -166,11 +168,9 @@ function Conta() {
                   </span>
                 </div>
                 <p className="mt-2 text-sm">
-                  {Array.isArray(o.items)
-                    ? o.items
-                        .map((i: { qty: number; name: string }) => `${i.qty}x ${i.name}`)
-                        .join(", ")
-                    : ""}
+                  {(o.items as unknown as { qty: number; name: string }[] | null ?? [])
+                    .map((i) => `${i.qty}x ${i.name}`)
+                    .join(", ")}
                 </p>
                 <p className="mt-2 font-semibold">{formatBRL(o.total)}</p>
               </li>

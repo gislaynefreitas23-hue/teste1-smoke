@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, navigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,8 +26,8 @@ export const Route = createFileRoute("/auth")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>): { next?: string } => ({
-    next: safeInternalPath(search.next) ?? undefined,
+  validateSearch: (search: Record<string, unknown>): { next: string } => ({
+    next: safeInternalPath(search["next"]) ?? "",
   }),
   component: Auth,
 });
@@ -47,7 +47,7 @@ function Auth() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}${next ?? "/conta"}`,
+        emailRedirectTo: `${window.location.origin}${next || "/conta"}`,
       },
     });
 
