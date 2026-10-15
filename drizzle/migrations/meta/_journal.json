@@ -8,6 +8,13 @@
       "when": 1792092178780,
       "tag": "0000_pantanal_smoke_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792092404724,
+      "tag": "0001_pantanal_profiles_and_storage",
+      "breakpoints": true
     }
   ]
 }
