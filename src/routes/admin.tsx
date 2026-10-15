@@ -133,7 +133,7 @@ function Orders() {
         .order("created_at", { ascending: false })
         .limit(200);
       if (error) throw error;
-      return (data ?? []) as Order[];
+      return (data ?? []) as unknown as Order[];
     },
   });
 

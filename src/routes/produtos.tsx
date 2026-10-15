@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { createFileRoute, useSuspenseQuery } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
 
 import { ProductCard } from "@/components/ProductCard";
 import { productsQueryOptions } from "@/lib/brasa";
