@@ -14,4 +14,5 @@
 - [ ] Conferir o fluxo completo no navegador (idade, catálogo, carrinho, pedido no WhatsApp)
 
 ## Bloqueado
+- [ ] Confirmar com o dono da loja o catálogo real (nomes, preços, fotos) e o número do WhatsApp
 - Catálogo real da loja: o banco do projeto original não é acessível daqui — vou usar produtos de exemplo e o dono da loja troca depois.
