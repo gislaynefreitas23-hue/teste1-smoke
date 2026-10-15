@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CarrinhoRouteImport } from './routes/carrinho'
 import { Route as ContaRouteImport } from './routes/conta'
 import { Route as ProdutosRouteImport } from './routes/produtos'
+import { Route as RecomendarRouteImport } from './routes/recomendar'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const ProdutosRoute = ProdutosRouteImport.update({
   path: '/produtos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecomendarRoute = RecomendarRouteImport.update({
+  id: '/recomendar',
+  path: '/recomendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/carrinho': typeof CarrinhoRoute
   '/conta': typeof ContaRoute
   '/produtos': typeof ProdutosRoute
+  '/recomendar': typeof RecomendarRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/carrinho': typeof CarrinhoRoute
   '/conta': typeof ContaRoute
   '/produtos': typeof ProdutosRoute
+  '/recomendar': typeof RecomendarRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,22 @@ export interface FileRoutesById {
   '/carrinho': typeof CarrinhoRoute
   '/conta': typeof ContaRoute
   '/produtos': typeof ProdutosRoute
+  '/recomendar': typeof RecomendarRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/carrinho' | '/conta' | '/produtos'
+  fullPaths:
+    '/' | '/auth' | '/carrinho' | '/conta' | '/produtos' | '/recomendar'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/carrinho' | '/conta' | '/produtos'
-  id: '__root__' | '/' | '/auth' | '/carrinho' | '/conta' | '/produtos'
+  to: '/' | '/auth' | '/carrinho' | '/conta' | '/produtos' | '/recomendar'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth'
+    | '/carrinho'
+    | '/conta'
+    | '/produtos'
+    | '/recomendar'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +94,7 @@ export interface RootRouteChildren {
   CarrinhoRoute: typeof CarrinhoRoute
   ContaRoute: typeof ContaRoute
   ProdutosRoute: typeof ProdutosRoute
+  RecomendarRoute: typeof RecomendarRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +134,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProdutosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recomendar': {
+      id: '/recomendar'
+      path: '/recomendar'
+      fullPath: '/recomendar'
+      preLoaderRoute: typeof RecomendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +150,7 @@ const rootRouteChildren: RootRouteChildren = {
   CarrinhoRoute: CarrinhoRoute,
   ContaRoute: ContaRoute,
   ProdutosRoute: ProdutosRoute,
+  RecomendarRoute: RecomendarRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
