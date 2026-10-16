@@ -1,9 +1,10 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { MessageCircle, Wallet } from "lucide-react";
+import { Truck, Wallet } from "lucide-react";
 
 import brandImage from "@/assets/pantanal-brand.png";
 import { Button } from "@/components/ui/button";
 import { CitySection } from "@/components/CitySection";
+import { WhatsAppOrderSection } from "@/components/WhatsAppOrderSection";
 import { useCity } from "@/lib/city";
 
 export const Route = createFileRoute("/")({
@@ -69,21 +70,23 @@ function Home() {
       {/* Seção de Seleção de Cidade na entrada da loja */}
       <CitySection />
 
-      <section className="grid gap-4 pb-6 sm:grid-cols-2">
-        <div className="rounded-2xl border bg-card p-6">
-          <MessageCircle className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold">Pedido no WhatsApp</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Monte o carrinho e finalize a compra direto na nossa conversa, sem cadastro e sem
-            taxa de plataforma.
+      {/* Seção de Pedido pelo WhatsApp */}
+      <WhatsAppOrderSection className="my-8" />
+
+      {/* Benefícios da Loja: Cashback na conta e Entrega Local */}
+      <section className="grid gap-4 pb-12 sm:grid-cols-2">
+        <div className="rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm">
+          <Wallet className="h-6 w-6 text-primary" aria-hidden="true" />
+          <h2 className="mt-3 text-lg font-semibold text-white">Cashback na conta</h2>
+          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+            Quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima compra.
           </p>
         </div>
-        <div className="rounded-2xl border bg-card p-6">
-          <Wallet className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold">Cashback na conta</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima
-            compra.
+        <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm">
+          <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
+          <h2 className="mt-3 text-lg font-semibold text-white">Entrega Local em Cuiabá</h2>
+          <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
+            Taxa fixa de R$ 10,00 para toda a cidade. Compre pelo site com checkout integrado ou peça pelo WhatsApp.
           </p>
         </div>
       </section>

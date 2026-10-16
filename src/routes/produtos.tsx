@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { ProductBannerCarousel } from "@/components/ProductBannerCarousel";
+import { WhatsAppOrderSection } from "@/components/WhatsAppOrderSection";
 import { productsQueryOptions } from "@/lib/brasa";
 import { useCity } from "@/lib/city";
 
@@ -85,6 +86,9 @@ function Produtos() {
           ))}
         </div>
       )}
+
+      {/* Seção alternativa de Pedido pelo WhatsApp */}
+      <WhatsAppOrderSection className="mt-14" />
     </main>
   );
 }

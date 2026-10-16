@@ -279,7 +279,7 @@ function Carrinho() {
 
             {session && (
               <p className="mt-2 text-xs text-muted-foreground">
-                Você ganha {formatBRL(earning)} de cashback quando a loja confirmar a entrega.
+                Você ganha {formatBRL(earning)} de cashback: quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima compra.
               </p>
             )}
 

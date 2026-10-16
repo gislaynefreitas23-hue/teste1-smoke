@@ -4,6 +4,7 @@ import {
   Check,
   ChevronRight,
   Clock,
+  Coins,
   Compass,
   Copy,
   CreditCard,
@@ -489,6 +490,14 @@ function CheckoutPage() {
                   <span className="text-primary">{formatBRL(orderSummary.total)}</span>
                 </div>
               </div>
+            </div>
+
+            {/* Cashback na conta */}
+            <div className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-slate-200">
+              <Coins className="h-4 w-4 text-primary shrink-0" />
+              <span>
+                <strong className="text-white">Cashback na conta:</strong> Quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima compra.
+              </span>
             </div>
           </div>
 
@@ -1075,6 +1084,10 @@ function CheckoutPage() {
               <div className="flex items-center gap-2 text-slate-300">
                 <Truck className="h-4 w-4 text-primary shrink-0" />
                 <span>Entrega rápida em Cuiabá e região</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <Coins className="h-4 w-4 text-primary shrink-0" />
+                <span>Cashback na conta: 5% volta como crédito ao confirmar o pedido</span>
               </div>
             </div>
           </div>
