@@ -13,9 +13,11 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AgeGate } from "../components/AgeGate";
+import { CityDialog } from "../components/CityDialog";
 import { SiteFooter } from "../components/SiteFooter";
 import { SiteHeader } from "../components/SiteHeader";
 import { CartProvider } from "../lib/cart";
+import { CityProvider } from "../lib/city";
 import { SITE_NAME } from "../lib/brasa";
 
 function NotFoundComponent() {
@@ -139,11 +141,14 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-        <AgeGate />
-        <SiteHeader />
-        {/* Necessário: as páginas filhas são renderizadas aqui. */}
-        <Outlet />
-        <SiteFooter />
+        <CityProvider>
+          <AgeGate />
+          <CityDialog />
+          <SiteHeader />
+          {/* Necessário: as páginas filhas são renderizadas aqui. */}
+          <Outlet />
+          <SiteFooter />
+        </CityProvider>
       </CartProvider>
     </QueryClientProvider>
   );
