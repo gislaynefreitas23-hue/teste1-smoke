@@ -77,9 +77,10 @@ function Home() {
       <section className="grid gap-4 pb-12 sm:grid-cols-2">
         <div className="rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm">
           <Wallet className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold text-white">Cashback na conta</h2>
+          <h2 className="mt-3 text-lg font-semibold text-white">Cashback na sua próxima compra</h2>
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            Quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima compra.
+            Entre na sua conta com seu e-mail e receba 5% do valor do seu pedido em cashback para{" "}
+            <strong className="text-white font-semibold">usar na próxima compra</strong>.
           </p>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm">

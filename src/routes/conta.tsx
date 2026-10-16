@@ -143,7 +143,8 @@ function Conta() {
         <p className="text-sm text-muted-foreground">Saldo de cashback</p>
         <p className="mt-1 text-4xl font-bold text-ember">{formatBRL(balance)}</p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Quando o pedido é confirmado, 5% do total volta como crédito para a sua próxima compra.
+          Entre na sua conta com seu e-mail e receba 5% do valor do seu pedido em cashback para{" "}
+          <strong className="text-foreground font-semibold">usar na próxima compra</strong>.
         </p>
       </section>
 

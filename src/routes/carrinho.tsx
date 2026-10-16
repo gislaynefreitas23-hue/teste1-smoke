@@ -255,7 +255,7 @@ function Carrinho() {
                   <Sparkles className="h-4 w-4 shrink-0 text-ember mt-0.5" aria-hidden="true" />
                   <div>
                     <p className="font-semibold text-foreground">
-                      Acumule {formatBRL(earning)} de cashback nesta compra
+                      Cashback na sua próxima compra ({formatBRL(earning)})
                     </p>
                     <p className="mt-1 text-muted-foreground leading-relaxed">
                       <Link
@@ -263,9 +263,10 @@ function Carrinho() {
                         search={{ next: "/carrinho" }}
                         className="font-medium text-ember underline underline-offset-2 hover:text-ember/80"
                       >
-                        Entre ou crie sua conta
+                        Entre na sua conta com seu e-mail
                       </Link>{" "}
-                      para resgatar 5% de volta na próxima compra.
+                      e receba 5% do valor do seu pedido em cashback para{" "}
+                      <strong className="text-foreground font-semibold">usar na próxima compra</strong>.
                     </p>
                   </div>
                 </div>
