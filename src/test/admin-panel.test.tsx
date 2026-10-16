@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ADMIN_CONFIG,
   checkAdminSession,
+  getAdminRedirectUrl,
   getStoreSettings,
   loginAdminWithSupabase,
   logoutAdmin,
@@ -144,6 +145,12 @@ describe("Painel Administrativo: Segurança, Supabase Auth e Persistência", () 
   });
 
   describe("5. Recuperação de senha por e-mail", () => {
+    it("gera o endereço de redirecionamento dinâmico baseado na origem publicada ou temporária", () => {
+      const redirectUrl = getAdminRedirectUrl();
+      expect(redirectUrl).toContain("/admin");
+      expect(redirectUrl).toMatch(/^https?:\/\//);
+    });
+
     it("solicita recuperação via Supabase Auth com URL de redirecionamento para /admin", async () => {
       const resetSpy = vi.spyOn(supabase.auth, "resetPasswordForEmail").mockResolvedValue({
         data: {},

@@ -301,6 +301,22 @@ export async function loginAdminWithSupabase(
 }
 
 /**
+ * Retorna o endereço correto para redirecionamento após recuperação de senha.
+ * Prioriza VITE_SITE_URL se configurado, ou utiliza dinamicamente o endereço publicado/temporário
+ * onde o administrador estiver acessando (ex: https://<projeto>.lovableproject.com/admin ou https://<app>.lovable.app/admin).
+ */
+export function getAdminRedirectUrl(): string {
+  if (typeof window !== "undefined") {
+    const customSiteUrl = (import.meta as any).env?.VITE_SITE_URL;
+    if (customSiteUrl && typeof customSiteUrl === "string" && customSiteUrl.startsWith("http")) {
+      return `${customSiteUrl.replace(/\/+$/, "")}/admin`;
+    }
+    return `${window.location.origin.replace(/\/+$/, "")}/admin`;
+  }
+  return "/admin";
+}
+
+/**
  * Solicita envio de e-mail de recuperação de senha pelo Supabase Auth.
  */
 export async function requestAdminPasswordReset(
@@ -312,10 +328,7 @@ export async function requestAdminPasswordReset(
       return { success: false, error: "Informe um e-mail válido para recuperação." };
     }
 
-    const redirectUrl =
-      typeof window !== "undefined"
-        ? `${window.location.origin}/admin`
-        : undefined;
+    const redirectUrl = getAdminRedirectUrl();
 
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
       redirectTo: redirectUrl,

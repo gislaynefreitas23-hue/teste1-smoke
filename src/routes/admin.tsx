@@ -84,12 +84,14 @@ function AdminPage() {
 
     async function checkCurrentSession() {
       try {
-        // Detecta se a URL contém hash de recuperação do Supabase Auth
-        if (
+        // 1. Detecta se a URL contém hash ou parâmetros de recuperação do Supabase Auth
+        const isRecoveryUrl =
           typeof window !== "undefined" &&
           (window.location.hash.includes("type=recovery") ||
-            window.location.href.includes("type=recovery"))
-        ) {
+            window.location.search.includes("type=recovery") ||
+            window.location.href.includes("type=recovery"));
+
+        if (isRecoveryUrl) {
           if (isMounted) {
             setAuthMode("reset_password");
             setSuccessMessage("Link de recuperação autenticado. Digite sua nova senha abaixo.");
@@ -97,6 +99,38 @@ function AdminPage() {
           return;
         }
 
+        // 2. Se houver código PKCE de autorização/recuperação do Supabase na query string
+        if (typeof window !== "undefined" && window.location.search.includes("code=")) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const authCode = urlParams.get("code");
+          if (authCode) {
+            const { data: exchangeData, error: exchangeError } =
+              await supabase.auth.exchangeCodeForSession(authCode);
+
+            if (!exchangeError && exchangeData?.session?.user) {
+              // Limpa a query string para deixar a URL limpa
+              window.history.replaceState(null, "", window.location.pathname);
+
+              const isUserAdmin = await verifyUserIsAdmin(exchangeData.session.user.id);
+              if (isUserAdmin) {
+                if (isMounted) {
+                  setCurrentUserEmail(exchangeData.session.user.email || "");
+                  setAuthMode("dashboard");
+                }
+                return;
+              } else {
+                await supabase.auth.signOut();
+                if (isMounted) {
+                  setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
+                  setAuthMode("login");
+                }
+                return;
+              }
+            }
+          }
+        }
+
+        // 3. Validação da sessão ativa persistida (permanência segura após atualizar a página)
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData?.session?.user;
 
@@ -106,6 +140,15 @@ function AdminPage() {
             if (isMounted) {
               setCurrentUserEmail(user.email || "");
               setAuthMode("dashboard");
+            }
+            return;
+          } else {
+            // Usuário comum logado tentando acessar /admin: desconecta imediatamente
+            await supabase.auth.signOut();
+            if (isMounted) {
+              setCurrentUserEmail("");
+              setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
+              setAuthMode("login");
             }
             return;
           }
@@ -121,7 +164,7 @@ function AdminPage() {
 
     checkCurrentSession();
 
-    // Ouve eventos do Supabase Auth (como recuperação de senha ou expiração de token)
+    // Ouve eventos do Supabase Auth (como recuperação de senha, login ou logout)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -144,6 +187,11 @@ function AdminPage() {
         if (isAdmin) {
           setCurrentUserEmail(session.user.email || "");
           setAuthMode("dashboard");
+        } else {
+          await supabase.auth.signOut();
+          setCurrentUserEmail("");
+          setAuthMode("login");
+          setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
         }
       }
     });
