@@ -181,55 +181,204 @@ export function useStoreSettings() {
 }
 
 // ==========================================
-// AUTENTICAÇÃO ADMINISTRATIVA (ADMIN AUTH)
+// AUTENTICAÇÃO ADMINISTRATIVA SEGURA (SUPABASE AUTH)
 // ==========================================
 export const ADMIN_CONFIG = {
   email: "gislaynefreitas23@gmail.com",
-  password: "tabacariasmoke2522",
 };
 
-const ADMIN_SESSION_KEY = "pantanal_admin_auth_session";
+/**
+ * Verifica se determinado usuário autenticado possui a função de administrador no banco de dados.
+ * Valida de forma segura usando a RPC has_role ou consultando diretamente a tabela user_roles.
+ */
+export async function verifyUserIsAdmin(userId?: string): Promise<boolean> {
+  try {
+    let targetUid = userId;
+    if (!targetUid) {
+      const { data: authData } = await supabase.auth.getUser();
+      targetUid = authData.user?.id;
+    }
 
-export interface AdminSession {
-  email: string;
-  authenticatedAt: string;
-  role: "admin";
+    if (!targetUid) return false;
+
+    // 1. Tenta a função segura has_role do Supabase
+    try {
+      const { data: hasRoleData, error: rpcError } = await (supabase as any).rpc("has_role", {
+        _user_id: targetUid,
+        _role: "admin",
+      });
+
+      if (!rpcError && typeof hasRoleData === "boolean") {
+        return hasRoleData;
+      }
+    } catch {
+      // Ignora erro de RPC e tenta fallback direto
+    }
+
+    // 2. Fallback: consulta direta à tabela public.user_roles com RLS
+    const { data: roleRow, error: tableError } = await (supabase as any)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", targetUid)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!tableError && roleRow && roleRow.role === "admin") {
+      return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error("Erro ao verificar permissão de administrador:", err);
+    return false;
+  }
 }
 
-export function checkAdminSession(): boolean {
-  if (typeof window === "undefined") return false;
+/**
+ * Verifica se a sessão atual do Supabase pertence a um administrador válido.
+ * Não confia em chaves arbitrárias salvas no localStorage.
+ */
+export async function checkAdminSession(): Promise<boolean> {
   try {
-    const raw = localStorage.getItem(ADMIN_SESSION_KEY);
-    if (!raw) return false;
-    const session: AdminSession = JSON.parse(raw);
-    return session.email.toLowerCase() === ADMIN_CONFIG.email.toLowerCase();
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.user) return false;
+
+    return await verifyUserIsAdmin(sessionData.session.user.id);
   } catch {
     return false;
   }
 }
 
-export function loginAdmin(emailInput: string, passwordInput: string): boolean {
-  const cleanEmail = emailInput.trim().toLowerCase();
-  const cleanPassword = passwordInput.trim();
+/**
+ * Realiza login administrativo oficial usando Supabase Auth (signInWithPassword)
+ * e garante que o usuário possui privilégios de administrador.
+ */
+export async function loginAdminWithSupabase(
+  emailInput: string,
+  passwordInput: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPassword = passwordInput.trim();
 
-  if (
-    cleanEmail === ADMIN_CONFIG.email.toLowerCase() &&
-    cleanPassword === ADMIN_CONFIG.password
-  ) {
-    const session: AdminSession = {
-      email: ADMIN_CONFIG.email,
-      authenticatedAt: new Date().toISOString(),
-      role: "admin",
+    if (!cleanEmail || !cleanPassword) {
+      return { success: false, error: "Informe o e-mail e a senha de administrador." };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: cleanEmail,
+      password: cleanPassword,
+    });
+
+    if (error || !data.user) {
+      return {
+        success: false,
+        error: error?.message || "Credenciais de administrador inválidas.",
+      };
+    }
+
+    const isAdmin = await verifyUserIsAdmin(data.user.id);
+    if (!isAdmin) {
+      // Desconecta imediatamente para impedir permanência indevida
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: "Acesso negado: Este usuário não possui privilégios de administrador.",
+      };
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("pantanal_admin_auth_changed"));
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Erro inesperado ao conectar ao serviço de autenticação.",
     };
-    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session));
-    window.dispatchEvent(new Event("pantanal_admin_auth_changed"));
-    return true;
   }
-  return false;
 }
 
-export function logoutAdmin(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(ADMIN_SESSION_KEY);
-  window.dispatchEvent(new Event("pantanal_admin_auth_changed"));
+/**
+ * Solicita envio de e-mail de recuperação de senha pelo Supabase Auth.
+ */
+export async function requestAdminPasswordReset(
+  emailInput: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const cleanEmail = emailInput.trim().toLowerCase();
+    if (!cleanEmail) {
+      return { success: false, error: "Informe um e-mail válido para recuperação." };
+    }
+
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/admin`
+        : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: redirectUrl,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Erro ao solicitar recuperação de senha.",
+    };
+  }
 }
+
+/**
+ * Atualiza a senha do administrador autenticado ou após fluxo de recuperação.
+ */
+export async function updateAdminPassword(
+  newPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!newPassword || newPassword.length < 6) {
+      return {
+        success: false,
+        error: "A nova senha deve possuir no mínimo 6 caracteres.",
+      };
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Erro ao redefinir a nova senha.",
+    };
+  }
+}
+
+/**
+ * Desconecta a sessão administrativa do Supabase Auth de forma segura.
+ */
+export async function logoutAdmin(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch (err) {
+    console.error("Erro ao encerrar sessão administrativa:", err);
+  } finally {
+    if (typeof window !== "undefined") {
+      // Limpa qualquer vestígio de sessão legada no localStorage
+      localStorage.removeItem("pantanal_admin_auth_session");
+      window.dispatchEvent(new Event("pantanal_admin_auth_changed"));
+    }
+  }
+}
+

@@ -41,11 +41,13 @@ import { formatBRL } from "@/lib/brasa";
 import {
   ADMIN_CONFIG,
   BannerSlide,
-  checkAdminSession,
-  loginAdmin,
+  loginAdminWithSupabase,
   logoutAdmin,
+  requestAdminPasswordReset,
   StoreSettings,
+  updateAdminPassword,
   useStoreSettings,
+  verifyUserIsAdmin,
 } from "@/lib/store-settings";
 
 export const Route = createFileRoute("/admin")({
@@ -61,58 +63,392 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-function AdminPage() {
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
+type AuthViewMode = "loading" | "login" | "forgot_password" | "reset_password" | "dashboard";
 
-  // Formulário de Login do Admin
-  const [emailInput, setEmailInput] = useState("gislaynefreitas23@gmail.com");
+function AdminPage() {
+  const [authMode, setAuthMode] = useState<AuthViewMode>("loading");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
+
+  // Estados dos formulários
+  const [emailInput, setEmailInput] = useState(ADMIN_CONFIG.email || "");
   const [passwordInput, setPasswordInput] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    setIsAdminLoggedIn(checkAdminSession());
-    setIsChecking(false);
+    let isMounted = true;
 
-    function handleAuthChange() {
-      setIsAdminLoggedIn(checkAdminSession());
+    async function checkCurrentSession() {
+      try {
+        // Detecta se a URL contém hash de recuperação do Supabase Auth
+        if (
+          typeof window !== "undefined" &&
+          (window.location.hash.includes("type=recovery") ||
+            window.location.href.includes("type=recovery"))
+        ) {
+          if (isMounted) {
+            setAuthMode("reset_password");
+            setSuccessMessage("Link de recuperação autenticado. Digite sua nova senha abaixo.");
+          }
+          return;
+        }
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData?.session?.user;
+
+        if (user) {
+          const isAdmin = await verifyUserIsAdmin(user.id);
+          if (isAdmin) {
+            if (isMounted) {
+              setCurrentUserEmail(user.email || "");
+              setAuthMode("dashboard");
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao verificar sessão administrativa:", err);
+      }
+
+      if (isMounted) {
+        setAuthMode("login");
+      }
     }
 
-    window.addEventListener("pantanal_admin_auth_changed", handleAuthChange);
+    checkCurrentSession();
+
+    // Ouve eventos do Supabase Auth (como recuperação de senha ou expiração de token)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+
+      if (event === "PASSWORD_RECOVERY") {
+        setAuthMode("reset_password");
+        setSuccessMessage("Link de recuperação validado. Defina sua nova senha abaixo.");
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
+        setAuthMode("login");
+        setCurrentUserEmail("");
+        return;
+      }
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const isAdmin = await verifyUserIsAdmin(session.user.id);
+        if (isAdmin) {
+          setCurrentUserEmail(session.user.email || "");
+          setAuthMode("dashboard");
+        }
+      }
+    });
+
     return () => {
-      window.removeEventListener("pantanal_admin_auth_changed", handleAuthChange);
+      isMounted = false;
+      subscription?.unsubscribe();
     };
   }, []);
 
-  function handleLoginSubmit(e: React.FormEvent) {
+  // --- Submissão de Login ---
+  async function handleLoginSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoginError(null);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
 
-    const success = loginAdmin(emailInput, passwordInput);
-    if (success) {
-      setIsAdminLoggedIn(true);
-    } else {
-      setLoginError("Credenciais de administrador inválidas. Verifique o e-mail e a senha.");
+    try {
+      const result = await loginAdminWithSupabase(emailInput, passwordInput);
+      if (result.success) {
+        setCurrentUserEmail(emailInput.trim());
+        setAuthMode("dashboard");
+      } else {
+        setErrorMessage(
+          result.error ||
+            "Credenciais administrativas inválidas ou sem permissão de administrador."
+        );
+      }
+    } catch {
+      setErrorMessage("Erro inesperado ao realizar login administrativo.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
-  function handleLogout() {
-    logoutAdmin();
-    setIsAdminLoggedIn(false);
-    setPasswordInput("");
+  // --- Solicitação de Recuperação de Senha ---
+  async function handleForgotPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await requestAdminPasswordReset(emailInput);
+      if (result.success) {
+        setSuccessMessage(
+          "Se o e-mail informado estiver cadastrado, você receberá um link seguro para redefinir sua senha. Verifique também a pasta de spam."
+        );
+      } else {
+        setErrorMessage(result.error || "Não foi possível solicitar a recuperação de senha.");
+      }
+    } catch {
+      setErrorMessage("Erro ao conectar com o serviço de recuperação.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  if (isChecking) {
+  // --- Redefinição de Nova Senha ---
+  async function handleResetPasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    if (newPasswordInput.length < 6) {
+      setErrorMessage("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    if (newPasswordInput !== confirmPasswordInput) {
+      setErrorMessage("As senhas digitadas não coincidem. Verifique e tente novamente.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await updateAdminPassword(newPasswordInput);
+      if (result.success) {
+        setSuccessMessage("Senha alterada com sucesso! Você já pode entrar com a nova senha.");
+        setNewPasswordInput("");
+        setConfirmPasswordInput("");
+        // Limpa hash da url e volta para login após breve confirmação
+        if (typeof window !== "undefined" && window.location.hash) {
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+        setTimeout(() => {
+          setAuthMode("login");
+        }, 2000);
+      } else {
+        setErrorMessage(result.error || "Não foi possível atualizar a senha.");
+      }
+    } catch {
+      setErrorMessage("Erro inesperado ao definir nova senha.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // --- Logout ---
+  async function handleLogout() {
+    await logoutAdmin();
+    setAuthMode("login");
+    setCurrentUserEmail("");
+    setPasswordInput("");
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  }
+
+  // Estado de Carregamento
+  if (authMode === "loading") {
     return (
       <main className="mx-auto flex min-h-[60vh] items-center justify-center text-muted-foreground">
         <RefreshCw className="h-6 w-6 animate-spin text-primary mr-2" />
-        Carregando painel administrativo...
+        Verificando permissões administrativas...
       </main>
     );
   }
 
-  // --- Tela de Login Administrativo ---
-  if (!isAdminLoggedIn) {
+  // --- TELA DE RECUPERAÇÃO DE SENHA (ESQUECI MINHA SENHA) ---
+  if (authMode === "forgot_password") {
+    return (
+      <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
+        <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary border border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.35)]">
+              <Mail className="h-7 w-7" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Recuperar Senha</h1>
+            <p className="text-xs text-muted-foreground">
+              Informe seu e-mail administrativo para receber um link seguro de recuperação via Supabase Auth.
+            </p>
+          </div>
+
+          <form onSubmit={handleForgotPasswordSubmit} className="mt-8 space-y-4">
+            <div>
+              <Label htmlFor="admin-reset-email" className="text-xs font-semibold">
+                E-mail Cadastrado
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="admin-reset-email"
+                  type="email"
+                  required
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="seu-email@dominio.com"
+                  className="pr-9 text-sm"
+                />
+                <Mail className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            {errorMessage && (
+              <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-400" />
+                <span>{successMessage}</span>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isSubmitting}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Enviando link...
+                </>
+              ) : (
+                "Enviar link de recuperação"
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("login");
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              ← Voltar para o login
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- TELA DE DEFINIÇÃO DE NOVA SENHA (PÓS LINK DE RECUPERAÇÃO) ---
+  if (authMode === "reset_password") {
+    return (
+      <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
+        <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
+          <div className="text-center space-y-2">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.35)]">
+              <Lock className="h-7 w-7" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Definir Nova Senha</h1>
+            <p className="text-xs text-muted-foreground">
+              Digite uma nova senha segura para acessar o Painel Master da Pantanal Smoke.
+            </p>
+          </div>
+
+          <form onSubmit={handleResetPasswordSubmit} className="mt-8 space-y-4">
+            <div>
+              <Label htmlFor="admin-new-pass" className="text-xs font-semibold">
+                Nova Senha (mínimo 6 caracteres)
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="admin-new-pass"
+                  type="password"
+                  required
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Digite sua nova senha"
+                  className="pr-9 text-sm"
+                />
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="admin-confirm-pass" className="text-xs font-semibold">
+                Confirmar Nova Senha
+              </Label>
+              <div className="relative mt-1">
+                <Input
+                  id="admin-confirm-pass"
+                  type="password"
+                  required
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  placeholder="Confirme sua nova senha"
+                  className="pr-9 text-sm"
+                />
+                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            {errorMessage && (
+              <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>{successMessage}</span>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              disabled={isSubmitting}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Atualizando senha...
+                </>
+              ) : (
+                "Salvar Nova Senha"
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("login");
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              ← Voltar para o login
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- TELA DE LOGIN ADMINISTRATIVO ---
+  if (authMode !== "dashboard") {
     return (
       <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
         <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
@@ -122,7 +458,7 @@ function AdminPage() {
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-white">Painel da Loja</h1>
             <p className="text-xs text-muted-foreground">
-              Acesso exclusivo para administradores da Pantanal Smoke
+              Acesso exclusivo para administradores autenticados via Supabase Auth
             </p>
           </div>
 
@@ -146,9 +482,22 @@ function AdminPage() {
             </div>
 
             <div>
-              <Label htmlFor="admin-pass" className="text-xs font-semibold">
-                Senha de Acesso
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="admin-pass" className="text-xs font-semibold">
+                  Senha de Acesso
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("forgot_password");
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
               <div className="relative mt-1">
                 <Input
                   id="admin-pass"
@@ -163,19 +512,34 @@ function AdminPage() {
               </div>
             </div>
 
-            {loginError && (
+            {errorMessage && (
               <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{loginError}</span>
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>{successMessage}</span>
               </div>
             )}
 
             <Button
               type="submit"
               size="lg"
+              disabled={isSubmitting}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
             >
-              Acessar Painel Master
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                  Autenticando...
+                </>
+              ) : (
+                "Acessar Painel Master"
+              )}
             </Button>
           </form>
 
@@ -189,11 +553,17 @@ function AdminPage() {
     );
   }
 
-  // --- Painel Master Autenticado ---
-  return <MasterAdminDashboard onLogout={handleLogout} />;
+  // --- Painel Master Autenticado com Papel Admin Confirmado ---
+  return <MasterAdminDashboard onLogout={handleLogout} userEmail={currentUserEmail} />;
 }
 
-function MasterAdminDashboard({ onLogout }: { onLogout: () => void }) {
+function MasterAdminDashboard({
+  onLogout,
+  userEmail,
+}: {
+  onLogout: () => void;
+  userEmail: string;
+}) {
   const { settings, saveSettings } = useStoreSettings();
   const [formData, setFormData] = useState<StoreSettings>(settings);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -229,7 +599,7 @@ function MasterAdminDashboard({ onLogout }: { onLogout: () => void }) {
             Painel Administrativo da Pantanal Smoke
           </h1>
           <p className="text-xs text-muted-foreground">
-            Conectado como <strong className="text-foreground">{ADMIN_CONFIG.email}</strong>
+            Conectado como <strong className="text-foreground">{userEmail || ADMIN_CONFIG.email}</strong>
           </p>
         </div>
 

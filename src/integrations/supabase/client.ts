@@ -83,5 +83,21 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     if (!_supabase) _supabase = createSupabaseClient();
     return Reflect.get(_supabase, prop, receiver);
   },
+  has(_, prop) {
+    if (!_supabase) _supabase = createSupabaseClient();
+    return Reflect.has(_supabase, prop);
+  },
+  set(_, prop, value) {
+    if (!_supabase) _supabase = createSupabaseClient();
+    return Reflect.set(_supabase, prop, value);
+  },
+  defineProperty(_, prop, descriptor) {
+    if (!_supabase) _supabase = createSupabaseClient();
+    return Reflect.defineProperty(_supabase, prop, descriptor);
+  },
+  getOwnPropertyDescriptor(_, prop) {
+    if (!_supabase) _supabase = createSupabaseClient();
+    return Reflect.getOwnPropertyDescriptor(_supabase, prop);
+  },
 });
 
