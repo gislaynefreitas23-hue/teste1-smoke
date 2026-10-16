@@ -16,12 +16,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Escolha, peça pelo WhatsApp e ganhe 5% de cashback em cada compra. Essências, narguilés e acessórios em Cuiabá e São Paulo.",
+          "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra. Essências, narguilés e acessórios em Cuiabá e São Paulo.",
       },
       { property: "og:title", content: "Pantanal Smoke — Conecte-se à sua vibe" },
       {
         property: "og:description",
-        content: "Peça pelo WhatsApp e ganhe 5% de cashback em cada compra.",
+        content: "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -48,7 +48,7 @@ function Home() {
           Conecte-se à sua <span className="text-ember">vibe</span>.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-          Escolha, peça pelo WhatsApp e ganhe 5% de cashback em cada compra.
+          Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button size="lg" className="bg-ember px-8 shadow-glow" asChild>
