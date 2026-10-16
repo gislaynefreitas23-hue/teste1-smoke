@@ -3,6 +3,8 @@ import { MessageCircle, Wallet } from "lucide-react";
 
 import brandImage from "@/assets/pantanal-brand.png";
 import { Button } from "@/components/ui/button";
+import { CitySection } from "@/components/CitySection";
+import { useCity } from "@/lib/city";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -11,7 +13,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Escolha, peça pelo WhatsApp e ganhe 5% de cashback em cada compra. Essências, narguilés e acessórios.",
+          "Escolha, peça pelo WhatsApp e ganhe 5% de cashback em cada compra. Essências, narguilés e acessórios em Cuiabá e São Paulo.",
       },
       { property: "og:title", content: "Pantanal Smoke — Conecte-se à sua vibe" },
       {
@@ -26,9 +28,11 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const { requireCityOrNavigate } = useCity();
+
   return (
     <main className="mx-auto max-w-6xl px-4">
-      <section className="py-14 text-center sm:py-20">
+      <section className="py-12 text-center sm:py-16">
         <img
           src={brandImage}
           alt="Pantanal Smoke"
@@ -44,13 +48,26 @@ function Home() {
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button size="lg" className="bg-ember px-8 shadow-glow" asChild>
-            <Link to="/produtos">Ver produtos</Link>
+            <Link
+              to="/produtos"
+              onClick={(e) => requireCityOrNavigate("/produtos", e)}
+            >
+              Ver produtos
+            </Link>
           </Button>
           <Button size="lg" variant="outline" className="px-8" asChild>
-            <Link to="/recomendar">Me ajude a escolher</Link>
+            <Link
+              to="/recomendar"
+              onClick={(e) => requireCityOrNavigate("/recomendar", e)}
+            >
+              Me ajude a escolher
+            </Link>
           </Button>
         </div>
       </section>
+
+      {/* Seção de Seleção de Cidade na entrada da loja */}
+      <CitySection />
 
       <section className="grid gap-4 pb-6 sm:grid-cols-2">
         <div className="rounded-2xl border bg-card p-6">
