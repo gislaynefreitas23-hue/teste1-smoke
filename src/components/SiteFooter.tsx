@@ -1,9 +1,12 @@
 import { Link } from "@tanstack/react-router";
+import { MapPin } from "lucide-react";
 
 import { SITE_NAME, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { useCity } from "@/lib/city";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
+  const { selectedCity, openSelector } = useCity();
 
   return (
     <footer className="mt-20 border-t bg-card/40">
@@ -11,8 +14,25 @@ export function SiteFooter() {
         <div>
           <p className="font-display text-lg font-semibold text-ember">{SITE_NAME}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Essências, narguilés e acessórios selecionados, com entrega em Cuiabá.
+            Essências, narguilés e acessórios selecionados, presentes em Cuiabá e São Paulo.
           </p>
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 text-primary" />
+            <span>
+              Cidade ativa:{" "}
+              <strong className="text-foreground">
+                {selectedCity ? `${selectedCity.name} - ${selectedCity.shortState}` : "Não selecionada"}
+              </strong>
+            </span>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={openSelector}
+              className="text-primary hover:underline font-semibold cursor-pointer"
+            >
+              Alterar cidade
+            </button>
+          </div>
         </div>
 
         <div className="text-sm">
