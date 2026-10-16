@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { MapPin } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
+import { ProductBannerCarousel } from "@/components/ProductBannerCarousel";
 import { productsQueryOptions } from "@/lib/brasa";
 import { useCity } from "@/lib/city";
 
@@ -54,6 +55,9 @@ function Produtos() {
           <span>Entrega local · Atendimento das 10h às 19h</span>
         </div>
       )}
+
+      {/* Banner de Destaques em Carrossel */}
+      <ProductBannerCarousel />
 
       <div className="mt-6 flex flex-wrap gap-2">
         {categories.map((c) => (
