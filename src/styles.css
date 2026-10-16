@@ -154,6 +154,48 @@
   color: transparent;
 }
 
+@keyframes purpleSmoke1 {
+  0% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+    opacity: 0.28;
+  }
+  33% {
+    transform: translate(30px, -20px) scale(1.15) rotate(5deg);
+    opacity: 0.52;
+  }
+  66% {
+    transform: translate(-25px, 15px) scale(0.92) rotate(-3deg);
+    opacity: 0.35;
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1) rotate(0deg);
+    opacity: 0.28;
+  }
+}
+
+@keyframes purpleSmoke2 {
+  0% {
+    transform: translate(0px, 0px) scale(1.05) rotate(0deg);
+    opacity: 0.32;
+  }
+  50% {
+    transform: translate(-30px, -25px) scale(1.22) rotate(-6deg);
+    opacity: 0.58;
+  }
+  100% {
+    transform: translate(0px, 0px) scale(1.05) rotate(0deg);
+    opacity: 0.32;
+  }
+}
+
+.animate-smoke-1 {
+  animation: purpleSmoke1 11s ease-in-out infinite;
+}
+
+.animate-smoke-2 {
+  animation: purpleSmoke2 15s ease-in-out infinite reverse;
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
