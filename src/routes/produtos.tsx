@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { MapPin } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { productsQueryOptions } from "@/lib/brasa";
+import { useCity } from "@/lib/city";
 
 export const Route = createFileRoute("/produtos")({
   head: () => ({
@@ -29,6 +31,7 @@ export const Route = createFileRoute("/produtos")({
 
 function Produtos() {
   const { data: products } = useSuspenseQuery(productsQueryOptions());
+  const { selectedCityId } = useCity();
   const [category, setCategory] = useState("Todos");
 
   const categories = ["Todos", ...new Set(products.map((p) => p.category))];
@@ -41,6 +44,16 @@ function Produtos() {
       <p className="mt-2 text-muted-foreground">
         Escolha, adicione ao carrinho e finalize pelo WhatsApp.
       </p>
+
+      {selectedCityId === "cuiaba" && (
+        <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-card/60 px-3.5 py-1.5 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5 text-primary" /> Cuiabá - MT
+          </span>
+          <span>•</span>
+          <span>Entrega local · Atendimento das 10h às 19h</span>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {categories.map((c) => (
