@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Sparkles, Zap, Gauge } from "lucide-react";
 import imgAurora from "@/assets/banner-aurora-berries.png";
 import imgPinkLemonade from "@/assets/banner-pink-lemonade.png";
 import imgToastedPineapple from "@/assets/banner-toasted-pineapple.png";
+import { useStoreSettings } from "@/lib/store-settings";
 
 type SlideItem = {
   id: number;
@@ -57,12 +58,37 @@ const SLIDES: SlideItem[] = [
 ];
 
 export function ProductBannerCarousel() {
+  const { settings } = useStoreSettings();
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
-  const totalSlides = SLIDES.length;
+  const activeBanners = settings.banners.filter((b) => b.active);
+  const slides: SlideItem[] =
+    activeBanners.length > 0
+      ? activeBanners.map((b, idx) => ({
+          id: idx + 1,
+          name: b.title,
+          puffs: b.puffs,
+          image: b.imageUrl || SLIDES[idx % SLIDES.length]?.image || imgAurora,
+          subtitle: "Série Especial Turbo",
+          footerPhrase: b.footerPhrase,
+          flavorDesc:
+            SLIDES[idx % SLIDES.length]?.flavorDesc ||
+            "Perfil refinado e vapor denso de alta durabilidade.",
+          features:
+            SLIDES[idx % SLIDES.length]?.features || [
+              "Alta Performance",
+              "Bateria Recarregável",
+              "Modo Turbo",
+            ],
+          glowColor:
+            SLIDES[idx % SLIDES.length]?.glowColor || "rgba(168, 85, 247, 0.45)",
+        }))
+      : SLIDES;
+
+  const totalSlides = slides.length;
 
   const nextSlide = useCallback(() => {
     setCurrent((prev) => (prev + 1) % totalSlides);
@@ -157,7 +183,7 @@ export function ProductBannerCarousel() {
           className="flex w-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
           style={{ transform: `translateX(-${current * 100}%)` }}
         >
-          {SLIDES.map((slide, index) => {
+          {slides.map((slide, index) => {
             const isSlideActive = index === current;
             return (
               <div
@@ -265,7 +291,7 @@ export function ProductBannerCarousel() {
         <div className="flex items-center gap-2 text-center sm:text-left">
           <Sparkles className="h-4 w-4 shrink-0 text-[#A855F7] drop-shadow-[0_0_6px_rgba(168,85,247,0.8)]" aria-hidden="true" />
           <div className="relative h-5 overflow-hidden sm:h-6 flex items-center">
-            {SLIDES.map((slide, idx) => (
+            {slides.map((slide, idx) => (
               <span
                 key={slide.id}
                 className={`transition-all duration-500 text-xs sm:text-sm font-semibold tracking-wide text-slate-100 ${
@@ -283,7 +309,7 @@ export function ProductBannerCarousel() {
         {/* Indicadores de posição (Dots com destaque roxo neon e contador) */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Navegação dos slides">
-            {SLIDES.map((slide, idx) => {
+            {slides.map((slide, idx) => {
               const isActive = idx === current;
               return (
                 <button

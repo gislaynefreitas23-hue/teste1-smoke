@@ -5,6 +5,8 @@ import brandImage from "@/assets/pantanal-brand.png";
 import { Button } from "@/components/ui/button";
 import { CitySection } from "@/components/CitySection";
 import { WhatsAppOrderSection } from "@/components/WhatsAppOrderSection";
+import { formatBRL } from "@/lib/brasa";
+import { useStoreSettings } from "@/lib/store-settings";
 import { useCity } from "@/lib/city";
 
 export const Route = createFileRoute("/")({
@@ -30,6 +32,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const { requireCityOrNavigate } = useCity();
+  const { settings } = useStoreSettings();
 
   return (
     <main className="mx-auto max-w-6xl px-4">
@@ -77,9 +80,9 @@ function Home() {
       <section className="grid gap-4 pb-12 sm:grid-cols-2">
         <div className="rounded-2xl border border-primary/20 bg-card/60 p-6 backdrop-blur-sm">
           <Wallet className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold text-white">Cashback na sua próxima compra</h2>
+          <h2 className="mt-3 text-lg font-semibold text-white">{settings.cashbackTitle || "Cashback na sua próxima compra"}</h2>
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            Entre na sua conta com seu e-mail e receba 5% do valor do seu pedido em cashback para{" "}
+            Entre na sua conta com seu e-mail e receba {(settings.cashbackRate * 100).toFixed(0)}% do valor do seu pedido em cashback para{" "}
             <strong className="text-white font-semibold">usar na próxima compra</strong>.
           </p>
         </div>
@@ -87,7 +90,7 @@ function Home() {
           <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
           <h2 className="mt-3 text-lg font-semibold text-white">Entrega Local em Cuiabá</h2>
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            Taxa fixa de R$ 10,00 para toda a cidade. Compre pelo site com checkout integrado ou peça pelo WhatsApp.
+            Taxa fixa de {formatBRL(settings.deliveryFeeCuiaba)} para toda a cidade. Compre pelo site com checkout integrado ou peça pelo WhatsApp.
           </p>
         </div>
       </section>

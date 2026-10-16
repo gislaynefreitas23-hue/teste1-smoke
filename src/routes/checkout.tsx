@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { useStoreSettings } from "@/lib/store-settings";
 import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 import { useAuthSession } from "@/lib/useAuth";
@@ -108,8 +109,9 @@ function CheckoutPage() {
   const [confirmedOrder, setConfirmedOrder] = useState<CheckoutResponse | null>(null);
   const [copiedPix, setCopiedPix] = useState(false);
 
+  const { settings } = useStoreSettings();
   const isCuiaba = selectedCityId === "cuiaba" || defaultCity.toLowerCase().includes("cuiab");
-  const deliveryFee = 10; // Taxa fixa de R$ 10,00 para toda Cuiabá
+  const deliveryFee = isCuiaba ? settings.deliveryFeeCuiaba : 0;
   const rawSubtotal = items.reduce((acc, i) => acc + i.price * i.qty, 0);
   const appliedCashback = useCashback ? Math.min(balance, rawSubtotal) : 0;
   const estimatedTotal = Math.max(0, rawSubtotal + deliveryFee - appliedCashback);
@@ -567,7 +569,7 @@ function CheckoutPage() {
               <div className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs text-slate-200">
                 <Truck className="h-5 w-5 text-primary shrink-0" />
                 <span>
-                  Entrega com <strong className="text-white font-bold">taxa fixa de R$ 10,00</strong> para toda a cidade de Cuiabá.
+                  Entrega com <strong className="text-white font-bold">taxa fixa de {formatBRL(deliveryFee)}</strong> para toda a cidade de Cuiabá.
                 </span>
               </div>
 

@@ -1,6 +1,7 @@
 import { MessageCircle, ShieldCheck, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WHATSAPP_NUMBER } from "@/lib/brasa";
+import { useStoreSettings } from "@/lib/store-settings";
 
 interface WhatsAppOrderSectionProps {
   className?: string;
@@ -9,11 +10,13 @@ interface WhatsAppOrderSectionProps {
 
 export function WhatsAppOrderSection({
   className = "",
-  defaultMessage = "Olá! Gostaria de fazer um pedido.",
+  defaultMessage,
 }: WhatsAppOrderSectionProps) {
-  // Constrói o link oficial do WhatsApp com código do país (55), DDD e número sem caracteres especiais
-  const cleanNumber = WHATSAPP_NUMBER.replace(/\D/g, "");
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(defaultMessage)}`;
+  const { settings } = useStoreSettings();
+  const rawNumber = settings.whatsappNumber || WHATSAPP_NUMBER;
+  const cleanNumber = rawNumber.replace(/\D/g, "");
+  const msg = defaultMessage || settings.whatsappMessage || "Olá! Gostaria de fazer um pedido.";
+  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`;
 
   return (
     <section
