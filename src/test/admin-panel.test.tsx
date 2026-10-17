@@ -227,6 +227,20 @@ describe("Painel Administrativo: Segurança, Supabase Auth e Persistência", () 
         benefitCardDescription: "Receba seus itens no mesmo dia com agilidade.",
         footerTagline: "De Cuiabá a São Paulo com você.",
         footerContactText: "Dúvidas ou suporte? Chame no",
+        aboutUsTitle: "Nossa Trajetória",
+        aboutUsParagraph1: "História personalizada da Pantanal...",
+        aboutUsParagraph2: "Atendimento diferenciado em MT e SP...",
+        aboutUsParagraph3: "Foco total na melhor experiência...",
+        aboutUsBrandPhrase: "Pantanal Smoke — Sua vibe em primeiro lugar.",
+        faqTitle: "Dúvidas Frequentes da Loja",
+        faqSubtitle: "Tudo o que você precisa saber antes de comprar.",
+        faqs: [
+          {
+            id: "teste-faq-1",
+            question: "Qual o horário de atendimento?",
+            answer: "Atendemos todos os dias das 10h às 23h.",
+          },
+        ],
       });
 
       const updated = getStoreSettings();
@@ -239,6 +253,15 @@ describe("Painel Administrativo: Segurança, Supabase Auth e Persistência", () 
       expect(updated.benefitCardDescription).toBe("Receba seus itens no mesmo dia com agilidade.");
       expect(updated.footerTagline).toBe("De Cuiabá a São Paulo com você.");
       expect(updated.footerContactText).toBe("Dúvidas ou suporte? Chame no");
+      expect(updated.aboutUsTitle).toBe("Nossa Trajetória");
+      expect(updated.aboutUsParagraph1).toBe("História personalizada da Pantanal...");
+      expect(updated.aboutUsParagraph2).toBe("Atendimento diferenciado em MT e SP...");
+      expect(updated.aboutUsParagraph3).toBe("Foco total na melhor experiência...");
+      expect(updated.aboutUsBrandPhrase).toBe("Pantanal Smoke — Sua vibe em primeiro lugar.");
+      expect(updated.faqTitle).toBe("Dúvidas Frequentes da Loja");
+      expect(updated.faqSubtitle).toBe("Tudo o que você precisa saber antes de comprar.");
+      expect(updated.faqs).toHaveLength(1);
+      expect(updated.faqs[0].question).toBe("Qual o horário de atendimento?");
     });
   });
 });

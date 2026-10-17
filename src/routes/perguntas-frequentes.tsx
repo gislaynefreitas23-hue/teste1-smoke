@@ -10,6 +10,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_STORE_SETTINGS, useStoreSettings } from "@/lib/store-settings";
 
 export const Route = createFileRoute("/perguntas-frequentes")({
   head: () => ({
@@ -32,45 +33,13 @@ export const Route = createFileRoute("/perguntas-frequentes")({
   component: PerguntasFrequentes,
 });
 
-interface FAQItem {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-const FAQS: FAQItem[] = [
-  {
-    id: "loja-fisica",
-    question: "A Pantanal Smoke possui loja física?",
-    answer: "Não! Somos uma loja 100% online, com atendimento em Cuiabá e São Paulo.",
-  },
-  {
-    id: "como-funciona-entrega",
-    question: "Como funciona a entrega?",
-    answer:
-      "Em Cuiabá, a taxa de entrega é fixa de R$ 10. Em São Paulo, oferecemos entrega grátis em diversos bairros da cidade. Consulte a disponibilidade para sua região.",
-  },
-  {
-    id: "pedido-mesmo-dia",
-    question: "Meu pedido chega no mesmo dia?",
-    answer:
-      "Trabalhamos com entregas no mesmo dia, conforme a disponibilidade, o horário do pedido e a região atendida.",
-  },
-  {
-    id: "pagar-na-entrega",
-    question: "Posso pagar na entrega?",
-    answer:
-      "Sim! Na Pantanal Smoke, você pode pagar somente quando receber seu pedido, garantindo mais segurança, praticidade e tranquilidade na sua compra.",
-  },
-  {
-    id: "cashback-5-porcento",
-    question: "Como funciona o cashback de 5%?",
-    answer:
-      "A cada compra elegível, você acumula 5% do valor em cashback para utilizar nas próximas compras, conforme as regras do cashback.",
-  },
-];
-
 function PerguntasFrequentes() {
+  const { settings } = useStoreSettings();
+
+  const title = settings.faqTitle || DEFAULT_STORE_SETTINGS.faqTitle;
+  const subtitle = settings.faqSubtitle || DEFAULT_STORE_SETTINGS.faqSubtitle;
+  const faqs = (settings.faqs && settings.faqs.length > 0) ? settings.faqs : DEFAULT_STORE_SETTINGS.faqs;
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:py-12 md:py-16">
       {/* Navegação de retorno */}
@@ -91,17 +60,17 @@ function PerguntasFrequentes() {
           <span>Central de Dúvidas</span>
         </div>
         <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-          Perguntas Frequentes
+          {title}
         </h1>
         <p className="mt-3 text-base sm:text-lg text-muted-foreground">
-          Tire suas dúvidas e compre com mais tranquilidade.
+          {subtitle}
         </p>
       </header>
 
       {/* Accordion estilizado com as perguntas */}
       <div className="rounded-2xl border border-border/80 bg-card/60 p-4 sm:p-8 shadow-sm backdrop-blur-sm">
         <Accordion type="single" collapsible className="w-full space-y-3">
-          {FAQS.map((faq, index) => (
+          {faqs.map((faq, index) => (
             <AccordionItem
               key={faq.id}
               value={faq.id}

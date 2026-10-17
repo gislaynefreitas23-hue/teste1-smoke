@@ -3,6 +3,7 @@ import { ArrowLeft, Sparkles, ShoppingBag } from "lucide-react";
 
 import { SITE_NAME } from "@/lib/brasa";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_STORE_SETTINGS, useStoreSettings } from "@/lib/store-settings";
 
 export const Route = createFileRoute("/sobre-nos")({
   head: () => ({
@@ -27,6 +28,14 @@ export const Route = createFileRoute("/sobre-nos")({
 });
 
 function SobreNos() {
+  const { settings } = useStoreSettings();
+
+  const title = settings.aboutUsTitle || DEFAULT_STORE_SETTINGS.aboutUsTitle;
+  const p1 = settings.aboutUsParagraph1 || DEFAULT_STORE_SETTINGS.aboutUsParagraph1;
+  const p2 = settings.aboutUsParagraph2 || DEFAULT_STORE_SETTINGS.aboutUsParagraph2;
+  const p3 = settings.aboutUsParagraph3 || DEFAULT_STORE_SETTINGS.aboutUsParagraph3;
+  const brandPhrase = settings.aboutUsBrandPhrase || DEFAULT_STORE_SETTINGS.aboutUsBrandPhrase;
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:py-12 md:py-16">
       {/* Navegação de retorno */}
@@ -47,38 +56,22 @@ function SobreNos() {
           <span>Institucional</span>
         </div>
         <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-          Sobre Nós
+          {title}
         </h1>
       </header>
 
       {/* Card com o conteúdo da história */}
       <article className="rounded-2xl border border-border/80 bg-card/60 p-6 sm:p-10 shadow-sm backdrop-blur-sm">
         <div className="space-y-6 text-base sm:text-lg leading-relaxed text-muted-foreground">
-          <p>
-            A Pantanal Smoke nasceu da visão de três empreendedores de Cuiabá que,
-            vivendo em São Paulo, identificaram uma oportunidade de transformar a
-            experiência de compra nas duas cidades.
-          </p>
-
-          <p>
-            Em Cuiabá, nosso propósito é oferecer mais variedade, qualidade e
-            preços justos. Em São Paulo, buscamos facilitar o acesso aos produtos,
-            com entregas práticas e gratuitas em diversos bairros.
-          </p>
-
-          <p>
-            Mais do que vender, queremos proporcionar{" "}
-            <strong className="font-semibold text-foreground">
-              conveniência, variedade e uma experiência diferenciada
-            </strong>{" "}
-            a cada cliente.
-          </p>
+          <p>{p1}</p>
+          <p>{p2}</p>
+          <p>{p3}</p>
         </div>
 
         {/* Frase final de destaque da marca */}
         <div className="mt-8 sm:mt-10 pt-6 sm:pt-8 border-t border-border/60 text-center sm:text-left">
           <p className="font-display text-xl sm:text-2xl font-bold text-ember tracking-wide">
-            Pantanal Smoke — Conecte a sua vibe.
+            {brandPhrase}
           </p>
         </div>
       </article>

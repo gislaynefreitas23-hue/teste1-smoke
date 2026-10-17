@@ -11,6 +11,7 @@ import {
   Edit2,
   Eye,
   FileText,
+  HelpCircle,
   ImagePlus,
   Layers,
   Lock,
@@ -42,6 +43,8 @@ import { formatBRL } from "@/lib/brasa";
 import {
   ADMIN_CONFIG,
   BannerSlide,
+  DEFAULT_STORE_SETTINGS,
+  FAQSettingItem,
   loginAdminWithSupabase,
   logoutAdmin,
   requestAdminPasswordReset,
@@ -623,6 +626,28 @@ function MasterAdminDashboard({
     setFormData(settings);
   }, [settings]);
 
+  const faqsList = formData.faqs && formData.faqs.length > 0 ? formData.faqs : DEFAULT_STORE_SETTINGS.faqs;
+
+  function handleFaqChange(index: number, field: "question" | "answer", value: string) {
+    const updated = [...faqsList];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, faqs: updated });
+  }
+
+  function handleAddFaq() {
+    const newFaq: FAQSettingItem = {
+      id: `faq-${Date.now()}`,
+      question: "",
+      answer: "",
+    };
+    setFormData({ ...formData, faqs: [...faqsList, newFaq] });
+  }
+
+  function handleRemoveFaq(index: number) {
+    const updated = faqsList.filter((_, i) => i !== index);
+    setFormData({ ...formData, faqs: updated });
+  }
+
   async function handleSaveGeneralSettings(e: React.FormEvent) {
     e.preventDefault();
     setIsSaving(true);
@@ -930,6 +955,200 @@ function MasterAdminDashboard({
                     className="mt-1 text-sm"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Seção: Página "Sobre Nós" */}
+            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
+              <div className="border-b border-slate-800 pb-3">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Página Institucional "Sobre Nós" (/sobre-nos)
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Edite a história, os propósitos regionais e a frase final de encerramento da página Sobre Nós.
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="st-about-title" className="text-xs font-semibold">
+                  Título da Página
+                </Label>
+                <Input
+                  id="st-about-title"
+                  value={formData.aboutUsTitle || ""}
+                  onChange={(e) => setFormData({ ...formData, aboutUsTitle: e.target.value })}
+                  placeholder="Sobre Nós"
+                  className="mt-1 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="st-about-p1" className="text-xs font-semibold">
+                  Parágrafo 1 — Origem e Fundação dos Empreendedores
+                </Label>
+                <Textarea
+                  id="st-about-p1"
+                  rows={3}
+                  value={formData.aboutUsParagraph1 || ""}
+                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph1: e.target.value })}
+                  placeholder="A Pantanal Smoke nasceu da visão de três empreendedores de Cuiabá que, vivendo em São Paulo..."
+                  className="mt-1 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="st-about-p2" className="text-xs font-semibold">
+                  Parágrafo 2 — Propósitos em Cuiabá e São Paulo
+                </Label>
+                <Textarea
+                  id="st-about-p2"
+                  rows={3}
+                  value={formData.aboutUsParagraph2 || ""}
+                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph2: e.target.value })}
+                  placeholder="Em Cuiabá, nosso propósito é oferecer mais variedade, qualidade e preços justos..."
+                  className="mt-1 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="st-about-p3" className="text-xs font-semibold">
+                  Parágrafo 3 — Compromisso com Conveniência e Experiência
+                </Label>
+                <Textarea
+                  id="st-about-p3"
+                  rows={2}
+                  value={formData.aboutUsParagraph3 || ""}
+                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph3: e.target.value })}
+                  placeholder="Mais do que vender, queremos proporcionar conveniência, variedade e uma experiência diferenciada a cada cliente."
+                  className="mt-1 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="st-about-brand" className="text-xs font-semibold">
+                  Frase de Assinatura da Marca (Destaque Final)
+                </Label>
+                <Input
+                  id="st-about-brand"
+                  value={formData.aboutUsBrandPhrase || ""}
+                  onChange={(e) => setFormData({ ...formData, aboutUsBrandPhrase: e.target.value })}
+                  placeholder="Pantanal Smoke — Conecte a sua vibe."
+                  className="mt-1 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Seção: Página "Perguntas Frequentes" */}
+            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <HelpCircle className="h-5 w-5 text-primary" />
+                    Página Institucional "Perguntas Frequentes" (/perguntas-frequentes)
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Gerencie o título, subtítulo e as perguntas/respostas do acordeão da central de dúvidas.
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  onClick={handleAddFaq}
+                  variant="outline"
+                  size="sm"
+                  className="border-primary/40 text-primary hover:bg-primary/10 gap-1.5 text-xs w-full sm:w-auto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Adicionar Pergunta
+                </Button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="st-faq-title" className="text-xs font-semibold">
+                    Título da Página
+                  </Label>
+                  <Input
+                    id="st-faq-title"
+                    value={formData.faqTitle || ""}
+                    onChange={(e) => setFormData({ ...formData, faqTitle: e.target.value })}
+                    placeholder="Perguntas Frequentes"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="st-faq-subtitle" className="text-xs font-semibold">
+                    Subtítulo / Chamada
+                  </Label>
+                  <Input
+                    id="st-faq-subtitle"
+                    value={formData.faqSubtitle || ""}
+                    onChange={(e) => setFormData({ ...formData, faqSubtitle: e.target.value })}
+                    placeholder="Tire suas dúvidas e compre com mais tranquilidade."
+                    className="mt-1 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Lista de FAQs editáveis */}
+              <div className="space-y-4 pt-2">
+                <Label className="text-xs font-semibold text-white">
+                  Perguntas e Respostas Cadastradas ({faqsList.length})
+                </Label>
+
+                {faqsList.map((faq, index) => (
+                  <div
+                    key={faq.id || `faq-${index}`}
+                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                      <span className="flex items-center gap-2 text-xs font-bold text-primary">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px]">
+                          {index + 1}
+                        </span>
+                        Pergunta #{index + 1}
+                      </span>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveFaq(index)}
+                        className="h-7 px-2 text-xs text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 gap-1"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Excluir
+                      </Button>
+                    </div>
+
+                    <div>
+                      <Label className="text-[11px] font-semibold text-slate-300">
+                        Pergunta
+                      </Label>
+                      <Input
+                        value={faq.question}
+                        onChange={(e) => handleFaqChange(index, "question", e.target.value)}
+                        placeholder="Ex: Como funciona a entrega?"
+                        className="mt-1 text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-[11px] font-semibold text-slate-300">
+                        Resposta
+                      </Label>
+                      <Textarea
+                        rows={2}
+                        value={faq.answer}
+                        onChange={(e) => handleFaqChange(index, "answer", e.target.value)}
+                        placeholder="Ex: Em Cuiabá, a taxa é fixa de R$ 10..."
+                        className="mt-1 text-xs"
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

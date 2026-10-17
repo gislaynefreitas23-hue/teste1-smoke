@@ -33,6 +33,23 @@ export interface StoreSettings {
   footerTagline: string;
   footerContactText: string;
   banners: BannerSlide[];
+
+  // Conteúdos Institucionais (Sobre Nós & Perguntas Frequentes)
+  aboutUsTitle: string;
+  aboutUsParagraph1: string;
+  aboutUsParagraph2: string;
+  aboutUsParagraph3: string;
+  aboutUsBrandPhrase: string;
+
+  faqTitle: string;
+  faqSubtitle: string;
+  faqs: FAQSettingItem[];
+}
+
+export interface FAQSettingItem {
+  id: string;
+  question: string;
+  answer: string;
 }
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
@@ -53,6 +70,47 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   benefitCardDescription: "Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia.",
   footerTagline: "De Cuiabá a São Paulo, conectando vibes.",
   footerContactText: "Dúvidas ou pedidos? Fale com a gente pelo",
+  aboutUsTitle: "Sobre Nós",
+  aboutUsParagraph1:
+    "A Pantanal Smoke nasceu da visão de três empreendedores de Cuiabá que, vivendo em São Paulo, identificaram uma oportunidade de transformar a experiência de compra nas duas cidades.",
+  aboutUsParagraph2:
+    "Em Cuiabá, nosso propósito é oferecer mais variedade, qualidade e preços justos. Em São Paulo, buscamos facilitar o acesso aos produtos, com entregas práticas e gratuitas em diversos bairros.",
+  aboutUsParagraph3:
+    "Mais do que vender, queremos proporcionar conveniência, variedade e uma experiência diferenciada a cada cliente.",
+  aboutUsBrandPhrase: "Pantanal Smoke — Conecte a sua vibe.",
+  faqTitle: "Perguntas Frequentes",
+  faqSubtitle: "Tire suas dúvidas e compre com mais tranquilidade.",
+  faqs: [
+    {
+      id: "loja-fisica",
+      question: "A Pantanal Smoke possui loja física?",
+      answer: "Não! Somos uma loja 100% online, com atendimento em Cuiabá e São Paulo.",
+    },
+    {
+      id: "como-funciona-entrega",
+      question: "Como funciona a entrega?",
+      answer:
+        "Em Cuiabá, a taxa de entrega é fixa de R$ 10. Em São Paulo, oferecemos entrega grátis em diversos bairros da cidade. Consulte a disponibilidade para sua região.",
+    },
+    {
+      id: "pedido-mesmo-dia",
+      question: "Meu pedido chega no mesmo dia?",
+      answer:
+        "Trabalhamos com entregas no mesmo dia, conforme a disponibilidade, o horário do pedido e a região atendida.",
+    },
+    {
+      id: "pagar-na-entrega",
+      question: "Posso pagar na entrega?",
+      answer:
+        "Sim! Na Pantanal Smoke, você pode pagar somente quando receber seu pedido, garantindo mais segurança, praticidade e tranquilidade na sua compra.",
+    },
+    {
+      id: "cashback-5-porcento",
+      question: "Como funciona o cashback de 5%?",
+      answer:
+        "A cada compra elegível, você acumula 5% do valor em cashback para utilizar nas próximas compras, conforme as regras do cashback.",
+    },
+  ],
   banners: [
     {
       id: "slide-1",

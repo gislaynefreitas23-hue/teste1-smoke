@@ -182,4 +182,39 @@ describe("Páginas Institucionais: Sobre Nós e Perguntas Frequentes", () => {
       expect(screen.getByRole("link", { name: "Produtos" })).toBeInTheDocument();
     });
   });
+
+  describe("5. Atualização Dinâmica via Painel Administrativo", () => {
+    it("reflete alterações de títulos, história e FAQs salvas nas configurações", async () => {
+      const { saveStoreSettings, DEFAULT_STORE_SETTINGS } = await import("@/lib/store-settings");
+
+      await saveStoreSettings({
+        ...DEFAULT_STORE_SETTINGS,
+        aboutUsTitle: "História Pantanal VIP",
+        aboutUsBrandPhrase: "Pantanal Smoke — Vibe Exclusiva.",
+        faqTitle: "FAQ Customizado",
+        faqSubtitle: "Perguntas atualizadas pelo painel.",
+        faqs: [
+          {
+            id: "custom-1",
+            question: "Qual o prazo de envio para Cuiabá?",
+            answer: "Entregas em até 2 horas na região urbana.",
+          },
+        ],
+      });
+
+      const SobreNosComponent = SobreNosRoute.options.component!;
+      const { unmount } = render(<SobreNosComponent />);
+      expect(screen.getByRole("heading", { name: "História Pantanal VIP", level: 1 })).toBeInTheDocument();
+      expect(screen.getByText("Pantanal Smoke — Vibe Exclusiva.")).toBeInTheDocument();
+      unmount();
+
+      const FaqComponent = PerguntasFrequentesRoute.options.component!;
+      render(<FaqComponent />);
+      expect(screen.getByRole("heading", { name: "FAQ Customizado", level: 1 })).toBeInTheDocument();
+      expect(screen.getByText("Perguntas atualizadas pelo painel.")).toBeInTheDocument();
+      const customQ = screen.getByRole("button", { name: /Qual o prazo de envio para Cuiabá\?/i });
+      fireEvent.click(customQ);
+      expect(await screen.findByText("Entregas em até 2 horas na região urbana.")).toBeInTheDocument();
+    });
+  });
 });
