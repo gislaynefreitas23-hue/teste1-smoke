@@ -36,7 +36,7 @@ function Home() {
 
   return (
     <main className="mx-auto max-w-6xl px-4">
-      <section className="py-12 text-center sm:py-16">
+      <section className="pt-8 pb-4 text-center sm:py-16">
         <img
           src={brandImage}
           alt="Pantanal Smoke"
@@ -50,7 +50,7 @@ function Home() {
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
           {settings.homeHighlightPhrase || "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."}
         </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <div className="mt-6 flex flex-wrap justify-center gap-3 sm:mt-8">
           <Button size="lg" className="bg-ember px-8 shadow-glow" asChild>
             <Link
               to="/produtos"

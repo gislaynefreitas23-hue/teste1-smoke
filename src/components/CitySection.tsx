@@ -16,7 +16,7 @@ export function CitySection({ id = "cidades", className = "" }: CitySectionProps
     <section
       id={id}
       aria-label="Seleção de cidade"
-      className={`relative my-6 sm:my-8 overflow-hidden rounded-2xl sm:rounded-3xl border border-primary/20 bg-card/40 p-3.5 sm:p-10 backdrop-blur-sm ${className}`}
+      className={`relative mt-2 mb-6 sm:my-8 overflow-hidden rounded-2xl sm:rounded-3xl border border-primary/20 bg-card/40 p-3.5 sm:p-10 backdrop-blur-sm ${className}`}
     >
       {/* Luz ambiente de fundo neon roxo */}
       <div

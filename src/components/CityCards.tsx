@@ -44,19 +44,19 @@ export function CityCards({ onSelected, compact = false }: CityCardsProps) {
             <div className="pointer-events-none absolute -top-14 left-1/2 h-28 w-44 -translate-x-1/2 rounded-full bg-primary/15 blur-2xl transition-opacity duration-300 group-hover:bg-primary/25" />
 
             <div>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-3">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-3">
                 <div className="flex h-8 w-8 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl border border-primary/30 bg-primary/10 text-primary transition-colors group-hover:border-primary/60 group-hover:bg-primary/20 shrink-0">
                   <MapPin className="h-4 w-4 sm:h-6 sm:w-6" aria-hidden="true" />
                 </div>
 
                 {isSelected ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs font-semibold text-primary w-fit">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs font-semibold text-primary shrink-0">
                     <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     <span className="hidden sm:inline">Região ativa</span>
                     <span className="sm:hidden">Ativo</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground">
+                  <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground shrink-0">
                     <span className="hidden sm:inline">Atendimento local</span>
                     <span className="sm:hidden">Local</span>
                   </span>
@@ -64,7 +64,7 @@ export function CityCards({ onSelected, compact = false }: CityCardsProps) {
               </div>
 
               <div className="mt-2.5 sm:mt-6">
-                <h3 className="text-sm sm:text-3xl font-bold tracking-tight text-foreground leading-snug">
+                <h3 className="text-base sm:text-3xl font-bold tracking-tight text-foreground leading-snug">
                   {city.name} <span className="text-xs sm:text-2xl text-muted-foreground sm:text-foreground">- {city.shortState}</span>
                 </h3>
                 <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-sm font-medium text-muted-foreground line-clamp-1">
