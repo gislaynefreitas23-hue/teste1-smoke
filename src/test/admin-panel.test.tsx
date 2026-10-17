@@ -222,6 +222,11 @@ describe("Painel Administrativo: Segurança, Supabase Auth e Persistência", () 
         deliveryFeeCuiaba: 12.0,
         whatsappNumber: "5565999210066",
         cashbackTitle: "Cashback Exclusivo",
+        homeHighlightPhrase: "Qualidade premium em cada detalhe",
+        benefitCardTitle: "Estoque Local Rápido",
+        benefitCardDescription: "Receba seus itens no mesmo dia com agilidade.",
+        footerTagline: "De Cuiabá a São Paulo com você.",
+        footerContactText: "Dúvidas ou suporte? Chame no",
       });
 
       const updated = getStoreSettings();
@@ -229,6 +234,11 @@ describe("Painel Administrativo: Segurança, Supabase Auth e Persistência", () 
       expect(updated.deliveryFeeCuiaba).toBe(12.0);
       expect(updated.whatsappNumber).toBe("5565999210066");
       expect(updated.cashbackTitle).toBe("Cashback Exclusivo");
+      expect(updated.homeHighlightPhrase).toBe("Qualidade premium em cada detalhe");
+      expect(updated.benefitCardTitle).toBe("Estoque Local Rápido");
+      expect(updated.benefitCardDescription).toBe("Receba seus itens no mesmo dia com agilidade.");
+      expect(updated.footerTagline).toBe("De Cuiabá a São Paulo com você.");
+      expect(updated.footerContactText).toBe("Dúvidas ou suporte? Chame no");
     });
   });
 });

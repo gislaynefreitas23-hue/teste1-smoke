@@ -4,10 +4,12 @@ import { MapPin } from "lucide-react";
 import { SITE_NAME, WHATSAPP_NUMBER } from "@/lib/brasa";
 import { openWhatsAppExternal } from "@/lib/whatsapp";
 import { useCity } from "@/lib/city";
+import { useStoreSettings } from "@/lib/store-settings";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
   const { selectedCity, openSelector } = useCity();
+  const { settings } = useStoreSettings();
 
   return (
     <footer className="mt-20 border-t bg-card/40">
@@ -15,7 +17,7 @@ export function SiteFooter() {
         <div>
           <p className="font-display text-lg font-semibold text-ember">{SITE_NAME}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            De Cuiabá a São Paulo, conectando vibes.
+            {settings.footerTagline || "De Cuiabá a São Paulo, conectando vibes."}
           </p>
           <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 text-primary" />
@@ -70,7 +72,7 @@ export function SiteFooter() {
         <div className="text-sm">
           <p className="font-semibold">Atendimento</p>
           <p className="mt-2 text-muted-foreground">
-            Dúvidas ou pedidos? Fale com a gente pelo{" "}
+            {settings.footerContactText || "Dúvidas ou pedidos? Fale com a gente pelo"}{" "}
             <a
               href={`https://wa.me/${WHATSAPP_NUMBER}`}
               target="_blank"

@@ -27,6 +27,11 @@ export interface StoreSettings {
   openingHours: string;
   announcementActive: boolean;
   announcementText: string;
+  homeHighlightPhrase: string;
+  benefitCardTitle: string;
+  benefitCardDescription: string;
+  footerTagline: string;
+  footerContactText: string;
   banners: BannerSlide[];
 }
 
@@ -43,6 +48,11 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   openingHours: "Atendimento das 10h às 19h",
   announcementActive: true,
   announcementText: "Entrega com taxa fixa de R$ 10,00 para toda a cidade de Cuiabá",
+  homeHighlightPhrase: "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.",
+  benefitCardTitle: "100% Online, Estoque Local",
+  benefitCardDescription: "Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia.",
+  footerTagline: "De Cuiabá a São Paulo, conectando vibes.",
+  footerContactText: "Dúvidas ou pedidos? Fale com a gente pelo",
   banners: [
     {
       id: "slide-1",

@@ -10,6 +10,7 @@ import {
   Coins,
   Edit2,
   Eye,
+  FileText,
   ImagePlus,
   Layers,
   Lock,
@@ -843,6 +844,92 @@ function MasterAdminDashboard({
                   placeholder="Entre na sua conta com seu e-mail e receba 5% do valor do seu pedido em cashback para usar na próxima compra."
                   className="mt-1 text-sm"
                 />
+              </div>
+            </div>
+
+            {/* Seção: Frases e Textos Institucionais do Site */}
+            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
+              <div className="border-b border-slate-800 pb-3">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary" />
+                  Frases & Textos Institucionais do Site
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Altere os slogans, frases de destaque da página inicial e textos do rodapé sem precisar mexer no código.
+                </p>
+              </div>
+
+              {/* 1. Frase de Destaque da Home */}
+              <div>
+                <Label htmlFor="st-home-highlight" className="text-xs font-semibold">
+                  Frase de Destaque da Página Inicial (Abaixo do Slogan)
+                </Label>
+                <Input
+                  id="st-home-highlight"
+                  value={formData.homeHighlightPhrase || ""}
+                  onChange={(e) => setFormData({ ...formData, homeHighlightPhrase: e.target.value })}
+                  placeholder="Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."
+                  className="mt-1 text-sm"
+                />
+              </div>
+
+              {/* 2. Card de Benefício / Estoque Local da Home */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="st-benefit-title" className="text-xs font-semibold">
+                    Título do Card de Estoque/Entrega Local
+                  </Label>
+                  <Input
+                    id="st-benefit-title"
+                    value={formData.benefitCardTitle || ""}
+                    onChange={(e) => setFormData({ ...formData, benefitCardTitle: e.target.value })}
+                    placeholder="100% Online, Estoque Local"
+                    className="mt-1 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="st-benefit-desc" className="text-xs font-semibold">
+                    Descrição do Card de Estoque/Entrega Local
+                  </Label>
+                  <Textarea
+                    id="st-benefit-desc"
+                    rows={2}
+                    value={formData.benefitCardDescription || ""}
+                    onChange={(e) => setFormData({ ...formData, benefitCardDescription: e.target.value })}
+                    placeholder="Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia."
+                    className="mt-1 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Frases do Rodapé */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="st-footer-tagline" className="text-xs font-semibold">
+                    Frase Institucional do Rodapé
+                  </Label>
+                  <Input
+                    id="st-footer-tagline"
+                    value={formData.footerTagline || ""}
+                    onChange={(e) => setFormData({ ...formData, footerTagline: e.target.value })}
+                    placeholder="De Cuiabá a São Paulo, conectando vibes."
+                    className="mt-1 text-sm"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="st-footer-contact" className="text-xs font-semibold">
+                    Frase de Atendimento no Rodapé (antes do link)
+                  </Label>
+                  <Input
+                    id="st-footer-contact"
+                    value={formData.footerContactText || ""}
+                    onChange={(e) => setFormData({ ...formData, footerContactText: e.target.value })}
+                    placeholder="Dúvidas ou pedidos? Fale com a gente pelo"
+                    className="mt-1 text-sm"
+                  />
+                </div>
               </div>
             </div>
 

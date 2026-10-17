@@ -48,7 +48,7 @@ function Home() {
           Conecte-se à sua <span className="text-ember">vibe</span>.
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-          Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.
+          {settings.homeHighlightPhrase || "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."}
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button size="lg" className="bg-ember px-8 shadow-glow" asChild>
@@ -88,9 +88,11 @@ function Home() {
         </div>
         <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm">
           <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold text-white">100% Online, Estoque Local</h2>
+          <h2 className="mt-3 text-lg font-semibold text-white">
+            {settings.benefitCardTitle || "100% Online, Estoque Local"}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia.
+            {settings.benefitCardDescription || "Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia."}
           </p>
         </div>
       </section>
