@@ -39,4 +39,38 @@ describe("WhatsAppOrderSection component", () => {
     expect(linkButton).toHaveAttribute("target", "_blank");
     expect(linkButton).toHaveAttribute("rel", "noopener noreferrer");
   });
+
+  it("buildWhatsAppUrl validates international format 55 + DDD and encodes message properly", async () => {
+    const { buildWhatsAppUrl, formatWhatsAppNumber } = await import("@/lib/whatsapp");
+
+    // Formata corretamente números com ou sem DDI 55
+    expect(formatWhatsAppNumber("65999210066")).toBe("5565999210066");
+    expect(formatWhatsAppNumber("5565999210066")).toBe("5565999210066");
+    expect(formatWhatsAppNumber("(65) 99921-0066")).toBe("5565999210066");
+
+    const url = buildWhatsAppUrl("65999210066", "Olá, tenho uma dúvida sobre essências!");
+    expect(url.startsWith("https://wa.me/5565999210066?text=")).toBe(true);
+    expect(url).toContain("Ol%C3%A1%2C%20tenho%20uma%20d%C3%BAvida");
+  });
+
+  it("openWhatsAppExternal calls window.open with _blank and noopener,noreferrer", async () => {
+    const { openWhatsAppExternal } = await import("@/lib/whatsapp");
+
+    const originalOpen = window.open;
+    const mockOpen = vi.fn().mockReturnValue({ closed: false, focus: vi.fn() });
+    window.open = mockOpen;
+
+    try {
+      const targetUrl = "https://wa.me/5565999210066?text=Teste";
+      openWhatsAppExternal(targetUrl);
+
+      expect(mockOpen).toHaveBeenCalledWith(
+        targetUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } finally {
+      window.open = originalOpen;
+    }
+  });
 });

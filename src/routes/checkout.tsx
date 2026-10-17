@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  Bookmark,
+  Briefcase,
   Check,
   ChevronRight,
   Clock,
@@ -8,28 +10,44 @@ import {
   Compass,
   Copy,
   CreditCard,
+  Home,
   Loader2,
   Lock,
   MapPin,
   Navigation,
+  Pencil,
+  Plus,
   QrCode,
   Search,
   ShieldCheck,
   ShoppingBag,
+  Trash2,
   Truck,
+  X,
   Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { formatBRL, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { formatBRL, TAXA_ENTREGA_CUIABA, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { buildWhatsAppUrl, openWhatsAppExternal } from "@/lib/whatsapp";
 import { useStoreSettings } from "@/lib/store-settings";
 import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 import { useAuthSession } from "@/lib/useAuth";
+import {
+  type CustomerAddress,
+  listCustomerAddresses,
+  saveCustomerAddress,
+  updateCustomerAddress,
+  deleteCustomerAddress,
+  getCustomerSessionAddresses,
+  saveCustomerSessionAddress,
+} from "@/lib/addresses";
 import {
   processCheckout,
   type CheckoutResponse,
@@ -50,7 +68,7 @@ export const Route = createFileRoute("/checkout")({
 });
 
 function CheckoutPage() {
-  const { items, clear } = useCart();
+  const { items, clear, cartCityId } = useCart();
   const { session } = useAuthSession();
   const { selectedCity, selectedCityId } = useCity();
 
@@ -110,11 +128,170 @@ function CheckoutPage() {
   const [copiedPix, setCopiedPix] = useState(false);
 
   const { settings } = useStoreSettings();
-  const isCuiaba = selectedCityId === "cuiaba" || defaultCity.toLowerCase().includes("cuiab");
-  const deliveryFee = isCuiaba ? settings.deliveryFeeCuiaba : 0;
+  const targetCityId: "cuiaba" | "sao-paulo" = (cartCityId || selectedCityId || "cuiaba") as any;
+  const isCuiaba = targetCityId === "cuiaba" || defaultCity.toLowerCase().includes("cuiab");
+  // REGRA OBRIGATÓRIA: Taxa fixa de R$ 10,00 para Cuiabá mantida em todas as condições
+  const deliveryFee = isCuiaba ? TAXA_ENTREGA_CUIABA : 0;
   const rawSubtotal = items.reduce((acc, i) => acc + i.price * i.qty, 0);
   const appliedCashback = useCashback ? Math.min(balance, rawSubtotal) : 0;
   const estimatedTotal = Math.max(0, rawSubtotal + deliveryFee - appliedCashback);
+
+  // Estados do sistema de endereços salvos
+  const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [isManualAddressMode, setIsManualAddressMode] = useState(false);
+  const [saveAddressForFuture, setSaveAddressForFuture] = useState(true);
+  const [addressLabel, setAddressLabel] = useState("Casa");
+  const [isLoadingAddresses, setIsLoadingAddresses] = useState(false);
+
+  // Edição inline de endereço salvo
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editRua, setEditRua] = useState("");
+  const [editNumero, setEditNumero] = useState("");
+  const [editBairro, setEditBairro] = useState("");
+  const [editCep, setEditCep] = useState("");
+  const [isUpdatingAddress, setIsUpdatingAddress] = useState(false);
+
+  // Carrega endereços salvos do cliente para a cidade atual (separação estrita Cuiabá x São Paulo)
+  useEffect(() => {
+    let active = true;
+    async function loadAddresses() {
+      setIsLoadingAddresses(true);
+      try {
+        if (session?.user?.id) {
+          const list = await listCustomerAddresses(session.user.id, targetCityId);
+          if (active) {
+            setSavedAddresses(list);
+            if (list.length > 0) {
+              const def = list.find((a) => a.is_default) || list[0];
+              setSelectedAddressId(def.id);
+              setCep(def.cep);
+              setRua(def.rua);
+              setNumero(def.numero);
+              setBairro(def.bairro);
+              setIsAddressConfirmed(true);
+              setIsManualAddressMode(false);
+            } else {
+              setSelectedAddressId(null);
+              setIsManualAddressMode(true);
+            }
+          }
+        } else {
+          // Visitante / compra sem cadastro prévio (sessão temporária sem localStorage persistente)
+          const sessionList = getCustomerSessionAddresses(targetCityId);
+          if (active) {
+            setSavedAddresses(sessionList);
+            if (sessionList.length > 0) {
+              const first = sessionList[0];
+              setSelectedAddressId(first.id);
+              setCep(first.cep);
+              setRua(first.rua);
+              setNumero(first.numero);
+              setBairro(first.bairro);
+              setIsAddressConfirmed(true);
+              setIsManualAddressMode(false);
+            } else {
+              setSelectedAddressId(null);
+              setIsManualAddressMode(true);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Erro ao carregar endereços:", err);
+      } finally {
+        if (active) setIsLoadingAddresses(false);
+      }
+    }
+
+    loadAddresses();
+    return () => {
+      active = false;
+    };
+  }, [session, targetCityId]);
+
+  function handleSelectSavedAddress(addr: CustomerAddress) {
+    setSelectedAddressId(addr.id);
+    setCep(addr.cep);
+    setRua(addr.rua);
+    setNumero(addr.numero);
+    setBairro(addr.bairro);
+    setIsAddressConfirmed(true);
+    setIsManualAddressMode(false);
+    setEditingAddressId(null);
+  }
+
+  function handleStartEditing(addr: CustomerAddress, e: React.MouseEvent) {
+    e.stopPropagation();
+    setEditingAddressId(addr.id);
+    setEditLabel(addr.label || "Casa");
+    setEditRua(addr.rua);
+    setEditNumero(addr.numero);
+    setEditBairro(addr.bairro);
+    setEditCep(addr.cep);
+  }
+
+  async function handleSaveEditedAddress(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingAddressId) return;
+    setIsUpdatingAddress(true);
+    try {
+      await updateCustomerAddress(editingAddressId, {
+        label: editLabel.trim() || "Casa",
+        rua: editRua.trim(),
+        numero: editNumero.trim(),
+        bairro: editBairro.trim(),
+        cep: editCep.trim(),
+      });
+      const updated = savedAddresses.map((a) =>
+        a.id === editingAddressId
+          ? {
+              ...a,
+              label: editLabel.trim() || "Casa",
+              rua: editRua.trim(),
+              numero: editNumero.trim(),
+              bairro: editBairro.trim(),
+              cep: editCep.trim(),
+            }
+          : a
+      );
+      setSavedAddresses(updated);
+      if (selectedAddressId === editingAddressId) {
+        setRua(editRua.trim());
+        setNumero(editNumero.trim());
+        setBairro(editBairro.trim());
+        setCep(editCep.trim());
+      }
+      setEditingAddressId(null);
+    } catch (err) {
+      console.error("Erro ao atualizar endereço:", err);
+    } finally {
+      setIsUpdatingAddress(false);
+    }
+  }
+
+  async function handleDeleteSavedAddress(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      await deleteCustomerAddress(id);
+      const remaining = savedAddresses.filter((a) => a.id !== id);
+      setSavedAddresses(remaining);
+      if (selectedAddressId === id) {
+        if (remaining.length > 0) {
+          handleSelectSavedAddress(remaining[0]);
+        } else {
+          setSelectedAddressId(null);
+          setIsManualAddressMode(true);
+          setCep("");
+          setRua("");
+          setNumero("");
+          setBairro("");
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao excluir endereço:", err);
+    }
+  }
 
   // Carrega saldo de cashback caso o cliente esteja logado
   useEffect(() => {
@@ -350,12 +527,43 @@ function CheckoutPage() {
                 }
               : undefined,
           useCashback,
-          selectedCityId: "cuiaba",
+          selectedCityId: (cartCityId || selectedCityId || "cuiaba") as any,
           idempotencyKey,
         },
         balance,
         session?.user?.id
       );
+
+      // Salva endereço para compras futuras caso o cliente tenha optado
+      if (saveAddressForFuture) {
+        if (session?.user?.id) {
+          saveCustomerAddress({
+            user_id: session.user.id,
+            city_id: targetCityId,
+            label: addressLabel.trim() || "Casa",
+            cep: cep.trim(),
+            rua: rua.trim(),
+            numero: numero.trim(),
+            bairro: bairro.trim(),
+            cidade: defaultCity,
+            uf: defaultUf,
+            is_default: savedAddresses.length === 0,
+          }).catch(console.error);
+        } else {
+          // Salva para a sessão ativa de visitantes sem armazenamento permanente
+          saveCustomerSessionAddress({
+            user_id: "guest",
+            city_id: targetCityId,
+            label: addressLabel.trim() || "Casa",
+            cep: cep.trim(),
+            rua: rua.trim(),
+            numero: numero.trim(),
+            bairro: bairro.trim(),
+            cidade: defaultCity,
+            uf: defaultUf,
+          });
+        }
+      }
 
       clear();
       setConfirmedOrder(response);
@@ -504,24 +712,66 @@ function CheckoutPage() {
             </div>
           </div>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild className="bg-ember px-6">
-              <Link to="/produtos">Continuar Comprando</Link>
-            </Button>
-            <Button
-              variant="outline"
-              asChild
-              className="border-slate-700 hover:bg-slate-800"
-            >
-              <a
-                href={`https://wa.me/${WHATSAPP_NUMBER}?text=Ol%C3%A1%2C%20gostaria%20de%20informa%C3%A7%C3%B5es%20sobre%20o%20pedido%20${orderId}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Atendimento WhatsApp
-              </a>
-            </Button>
-          </div>
+          {(() => {
+            const isCuiabaOrder =
+              orderSummary.deliveryFee > 0 ||
+              (address.cidade && address.cidade.toLowerCase().includes("cuiab")) ||
+              targetCityId === "cuiaba";
+
+            const whatsappMessageLines = [
+              `🔥 *Olá! Realizei o pedido ${orderId} na Pantanal Smoke:*`,
+              "",
+              `📍 *Cidade de atendimento:* ${address.cidade || (isCuiabaOrder ? "Cuiabá" : "São Paulo")} — ${address.uf || (isCuiabaOrder ? "MT" : "SP")}`,
+              `👤 *Cliente:* ${customer.name}`,
+              `📱 *Telefone:* ${customer.phone}`,
+              `🏠 *Endereço de Entrega:* ${address.rua}, Nº ${address.numero} — ${address.bairro}, ${address.cidade}/${address.uf} (CEP: ${address.cep})`,
+              "",
+              "*Itens do pedido:*",
+              ...orderSummary.verifiedItems.map(
+                (i) => `• ${i.qty}x ${i.name} — ${formatBRL(i.price)} cada (${formatBRL(i.price * i.qty)})`
+              ),
+              "",
+              `*Subtotal dos produtos:* ${formatBRL(orderSummary.subtotal)}`,
+              isCuiabaOrder
+                ? `*Taxa fixa de entrega (Cuiabá):* ${formatBRL(orderSummary.deliveryFee || 10.0)}`
+                : `*Taxa de entrega:* ${orderSummary.deliveryFee > 0 ? formatBRL(orderSummary.deliveryFee) : "Expresso / A combinar"}`,
+              orderSummary.cashbackUsed > 0
+                ? `*Cashback utilizado:* -${formatBRL(orderSummary.cashbackUsed)}`
+                : "",
+              `*Valor total do pedido:* ${formatBRL(orderSummary.total)}`,
+              `*Forma de pagamento:* ${paymentResult.method.toUpperCase()}`,
+              `*Status:* ${paymentResult.status === "aguardando_pagamento" ? "Aguardando Pagamento" : paymentResult.status}`,
+              "",
+              isCuiabaOrder
+                ? "🕒 *Entrega rápida em Cuiabá · Taxa fixa R$ 10,00*"
+                : "📦 *Envio expresso para São Paulo*",
+            ]
+              .filter(Boolean)
+              .join("\n");
+
+            const whatsappUrl = buildWhatsAppUrl(WHATSAPP_NUMBER, whatsappMessageLines);
+
+            return (
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Button asChild className="bg-ember px-6">
+                  <Link to="/produtos">Continuar Comprando</Link>
+                </Button>
+                <Button
+                  asChild
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md px-6 gap-2"
+                >
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => openWhatsAppExternal(whatsappUrl, e)}
+                  >
+                    Enviar Detalhes no WhatsApp
+                  </a>
+                </Button>
+              </div>
+            );
+          })()}
         </div>
       </main>
     );
@@ -560,204 +810,480 @@ function CheckoutPage() {
           <form onSubmit={handleSubmitCheckout} className="space-y-6">
             {/* Seção Exclusiva: Endereço de Entrega */}
             <section className="rounded-2xl border border-slate-800 bg-card/60 p-5 backdrop-blur-sm sm:p-6 space-y-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                Endereço de Entrega
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-primary" />
+                  Endereço de Entrega
+                </h2>
 
-              {/* 1. Aviso que a entrega é R$ 10,00 taxa fixa para toda Cuiabá */}
+                {savedAddresses.length > 0 && !isManualAddressMode && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsManualAddressMode(true);
+                      setSelectedAddressId(null);
+                      setCep("");
+                      setRua("");
+                      setNumero("");
+                      setBairro("");
+                      setIsAddressConfirmed(false);
+                    }}
+                    className="text-xs border-slate-700 hover:bg-slate-800 text-slate-300 gap-1.5"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-primary" />
+                    <span>Novo Endereço</span>
+                  </Button>
+                )}
+              </div>
+
+              {/* 1. Aviso de Taxa Fixa de Entrega de R$ 10,00 para Cuiabá mantida obrigatoriamente */}
               <div className="flex items-center gap-2.5 rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs text-slate-200">
                 <Truck className="h-5 w-5 text-primary shrink-0" />
                 <span>
-                  Entrega com <strong className="text-white font-bold">taxa fixa de {formatBRL(deliveryFee)}</strong> para toda a cidade de Cuiabá.
+                  {isCuiaba ? (
+                    <>
+                      Entrega em Cuiabá com <strong className="text-white font-bold">taxa fixa de {formatBRL(deliveryFee)}</strong> para toda a cidade.
+                    </>
+                  ) : (
+                    <>
+                      Atendimento em <strong className="text-white font-bold">São Paulo</strong> · Envio expresso para a capital.
+                    </>
+                  )}
                 </span>
               </div>
 
-              {/* 2. Buscar no mapa / Usar minha localização */}
-              <div className="space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <div className="relative flex-1">
-                    <Input
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar no mapa por rua, número, bairro ou CEP..."
-                      className="pr-9 text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSearchLocation();
-                        }
-                      }}
-                    />
-                    <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+              {/* 2. Seleção de Endereços Salvos */}
+              {savedAddresses.length > 0 && !isManualAddressMode && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Bookmark className="h-3.5 w-3.5 text-primary" />
+                      Meus Endereços Salvos ({isCuiaba ? "Cuiabá" : "São Paulo"})
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Clique no endereço para selecioná-lo
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => handleSearchLocation()}
-                      disabled={isSearchingLocation}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
-                    >
-                      {isSearchingLocation ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Buscar no mapa"
-                      )}
-                    </Button>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {savedAddresses.map((addr) => {
+                      const isSelected = selectedAddressId === addr.id;
+                      const isWork = addr.label?.toLowerCase().includes("trabalho") || addr.label?.toLowerCase().includes("escrit");
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleUseCurrentLocation}
-                      disabled={isLocating}
-                      title="Usar minha localização atual"
-                      className="border-slate-700 hover:bg-slate-800 text-xs gap-1.5"
-                    >
-                      {isLocating ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                      ) : (
-                        <Navigation className="h-3.5 w-3.5 text-primary" />
-                      )}
-                      <span>Usar minha localização</span>
-                    </Button>
-                  </div>
-                </div>
+                      return (
+                        <div
+                          key={addr.id}
+                          onClick={() => handleSelectSavedAddress(addr)}
+                          className={`relative flex flex-col justify-between rounded-2xl border p-4 text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(168,85,247,0.25)] ring-1 ring-primary"
+                              : "border-slate-800 bg-slate-900/60 hover:border-slate-700"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                                  isSelected
+                                    ? "bg-primary text-primary-foreground font-bold"
+                                    : "bg-slate-800 text-slate-300"
+                                }`}
+                              >
+                                {isWork ? (
+                                  <Briefcase className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Home className="h-3.5 w-3.5" />
+                                )}
+                              </div>
+                              <span className="text-xs font-bold text-white capitalize">
+                                {addr.label || "Casa"}
+                              </span>
+                              {addr.is_default && (
+                                <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[9px] font-semibold text-primary">
+                                  Padrão
+                                </span>
+                              )}
+                            </div>
 
-                {locationError && (
-                  <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 p-2.5 rounded-xl">
-                    {locationError}
-                  </p>
-                )}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => handleStartEditing(addr, e)}
+                                title="Editar endereço"
+                                className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteSavedAddress(addr.id, e)}
+                                title="Excluir endereço"
+                                className="rounded-md p-1 text-slate-400 hover:bg-red-950/60 hover:text-red-400 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
 
-                {/* Mapa Interativo */}
-                {!isAddressConfirmed ? (
-                  <div className="space-y-3">
-                    <div className="relative h-52 sm:h-60 w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 shadow-inner">
-                      <iframe
-                        title="Mapa de Entrega"
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lng - 0.006}%2C${coords.lat - 0.004}%2C${coords.lng + 0.006}%2C${coords.lat + 0.004}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`}
-                        className="h-full w-full border-0 pointer-events-auto"
-                        loading="lazy"
-                      />
-                      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full flex flex-col items-center">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.9)] border-2 border-white animate-bounce">
-                          <MapPin className="h-5 w-5" />
+                          <div className="mt-2.5 space-y-0.5">
+                            <p className="text-xs font-medium text-white">
+                              {addr.rua}, Nº {addr.numero}
+                            </p>
+                            <p className="text-[11px] text-slate-300">
+                              {addr.bairro} — {addr.cidade}/{addr.uf}
+                            </p>
+                            <p className="font-mono text-[10px] text-slate-400">
+                              CEP: {addr.cep}
+                            </p>
+                          </div>
+
+                          <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px]">
+                            {isSelected ? (
+                              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                                <Check className="h-3.5 w-3.5" /> Selecionado para entrega
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 hover:text-slate-200">
+                                Usar este endereço
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="h-2 w-2 rounded-full bg-black/60 blur-xs mt-0.5" />
+                      );
+                    })}
+                  </div>
+
+                  {/* Edição inline caso algum endereço esteja sendo editado */}
+                  {editingAddressId && (
+                    <div className="mt-3 rounded-2xl border border-primary/40 bg-[#161922] p-4 shadow-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <Pencil className="h-3.5 w-3.5 text-primary" /> Editar Endereço
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAddressId(null)}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <div>
+                          <Label className="text-[11px] text-slate-300">Apelido (ex: Casa, Trabalho)</Label>
+                          <Input
+                            value={editLabel}
+                            onChange={(e) => setEditLabel(e.target.value)}
+                            className="mt-1 h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-slate-300">CEP</Label>
+                          <Input
+                            value={editCep}
+                            onChange={(e) => setEditCep(e.target.value)}
+                            className="mt-1 h-8 text-xs font-mono"
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Label className="text-[11px] text-slate-300">Rua / Avenida</Label>
+                          <Input
+                            value={editRua}
+                            onChange={(e) => setEditRua(e.target.value)}
+                            className="mt-1 h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-slate-300">Bairro</Label>
+                          <Input
+                            value={editBairro}
+                            onChange={(e) => setEditBairro(e.target.value)}
+                            className="mt-1 h-8 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-[11px] text-slate-300">Número</Label>
+                          <Input
+                            value={editNumero}
+                            onChange={(e) => setEditNumero(e.target.value)}
+                            className="mt-1 h-8 text-xs font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingAddressId(null)}
+                          className="text-xs text-slate-400"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={isUpdatingAddress}
+                          onClick={handleSaveEditedAddress}
+                          className="bg-primary text-primary-foreground text-xs gap-1"
+                        >
+                          {isUpdatingAddress ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          Salvar Alterações
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Formulário Manual de Endereço (quando sem endereços salvos ou ao cadastrar novo) */}
+              {(isManualAddressMode || savedAddresses.length === 0) && (
+                <div className="space-y-4 pt-1">
+                  {savedAddresses.length > 0 && (
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setIsManualAddressMode(false);
+                          if (savedAddresses.length > 0) {
+                            handleSelectSavedAddress(savedAddresses[0]);
+                          }
+                        }}
+                        className="text-xs text-primary hover:text-primary/90 underline underline-offset-2 p-0 h-auto"
+                      >
+                        ← Voltar e escolher um endereço salvo
+                      </Button>
+                      <span className="text-[11px] text-muted-foreground">Novo cadastro</span>
+                    </div>
+                  )}
+
+                  {/* Buscar no mapa / Usar minha localização */}
+                  <div className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <div className="relative flex-1">
+                        <Input
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          placeholder="Buscar no mapa por rua, número, bairro ou CEP..."
+                          className="pr-9 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSearchLocation();
+                            }
+                          }}
+                        />
+                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          onClick={() => handleSearchLocation()}
+                          disabled={isSearchingLocation}
+                          className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs"
+                        >
+                          {isSearchingLocation ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Buscar no mapa"
+                          )}
+                        </Button>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleUseCurrentLocation}
+                          disabled={isLocating}
+                          title="Usar minha localização atual"
+                          className="border-slate-700 hover:bg-slate-800 text-xs gap-1.5"
+                        >
+                          {isLocating ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : (
+                            <Navigation className="h-3.5 w-3.5 text-primary" />
+                          )}
+                          <span>Usar minha localização</span>
+                        </Button>
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        onClick={() => setIsAddressConfirmed(true)}
-                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs gap-1.5 shadow-md"
-                      >
-                        <Check className="h-4 w-4" />
-                        Confirmar endereço no mapa
-                      </Button>
+                    {locationError && (
+                      <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 p-2.5 rounded-xl">
+                        {locationError}
+                      </p>
+                    )}
+
+                    {/* Mapa Interativo */}
+                    {!isAddressConfirmed ? (
+                      <div className="space-y-3">
+                        <div className="relative h-52 sm:h-60 w-full overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900 shadow-inner">
+                          <iframe
+                            title="Mapa de Entrega"
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lng - 0.006}%2C${coords.lat - 0.004}%2C${coords.lng + 0.006}%2C${coords.lat + 0.004}&layer=mapnik&marker=${coords.lat}%2C${coords.lng}`}
+                            className="h-full w-full border-0 pointer-events-auto"
+                            loading="lazy"
+                          />
+                          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full flex flex-col items-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_15px_rgba(168,85,247,0.9)] border-2 border-white animate-bounce">
+                              <MapPin className="h-5 w-5" />
+                            </div>
+                            <div className="h-2 w-2 rounded-full bg-black/60 blur-xs mt-0.5" />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            onClick={() => setIsAddressConfirmed(true)}
+                            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs gap-1.5 shadow-md"
+                          >
+                            <Check className="h-4 w-4" />
+                            Confirmar endereço no mapa
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between rounded-xl border border-primary/40 bg-primary/10 p-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <Check className="h-4 w-4 text-emerald-400" />
+                          <span className="text-xs text-slate-200">Localização confirmada no mapa</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsAddressConfirmed(false)}
+                          className="border-slate-700 hover:bg-slate-800 text-xs text-slate-300"
+                        >
+                          <Compass className="h-3.5 w-3.5 mr-1 text-primary" />
+                          Alterar localização
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Campos específicos: CEP, RUA, BAIRRO, NÚMERO */}
+                  <div className="border-t border-slate-800/80 pt-4 space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <Label htmlFor="chk-cep" className="text-xs font-bold text-foreground">
+                          CEP *
+                        </Label>
+                        <Input
+                          id="chk-cep"
+                          required
+                          value={cep}
+                          maxLength={9}
+                          onChange={(e) => setCep(e.target.value)}
+                          placeholder="78000-000"
+                          className="mt-1 text-sm font-mono"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <Label htmlFor="chk-rua" className="text-xs font-bold text-foreground">
+                          RUA *
+                        </Label>
+                        <Input
+                          id="chk-rua"
+                          required
+                          value={rua}
+                          onChange={(e) => setRua(e.target.value)}
+                          placeholder="Nome da rua / avenida"
+                          className="mt-1 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label htmlFor="chk-bairro" className="text-xs font-bold text-foreground">
+                          BAIRRO *
+                        </Label>
+                        <Input
+                          id="chk-bairro"
+                          required
+                          value={bairro}
+                          onChange={(e) => setBairro(e.target.value)}
+                          placeholder="Bairro"
+                          className="mt-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="chk-numero" className="text-xs font-bold text-foreground">
+                          NÚMERO *
+                        </Label>
+                        <Input
+                          id="chk-numero"
+                          required
+                          value={numero}
+                          onChange={(e) => setNumero(e.target.value)}
+                          placeholder="Ex.: 123"
+                          className="mt-1 text-sm font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Opção para Salvar Endereço para Próximas Compras */}
+                    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3.5 space-y-2.5">
+                      <div className="flex items-center space-x-2.5">
+                        <Checkbox
+                          id="save-address-chk"
+                          checked={saveAddressForFuture}
+                          onCheckedChange={(checked) => setSaveAddressForFuture(!!checked)}
+                        />
+                        <Label
+                          htmlFor="save-address-chk"
+                          className="text-xs font-semibold text-slate-200 cursor-pointer"
+                        >
+                          Salvar endereço para próximas compras
+                        </Label>
+                      </div>
+
+                      {saveAddressForFuture && (
+                        <div className="flex items-center gap-2 pt-1 pl-6">
+                          <Label htmlFor="chk-addr-label" className="text-[11px] text-muted-foreground shrink-0">
+                            Identificação do local:
+                          </Label>
+                          <Input
+                            id="chk-addr-label"
+                            value={addressLabel}
+                            onChange={(e) => setAddressLabel(e.target.value)}
+                            placeholder="Ex.: Casa, Trabalho"
+                            className="h-8 max-w-[180px] text-xs"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex items-center justify-between rounded-xl border border-primary/40 bg-primary/10 p-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <Check className="h-4 w-4 text-emerald-400" />
-                      <span className="text-xs text-slate-200">Localização confirmada no mapa</span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAddressConfirmed(false)}
-                      className="border-slate-700 hover:bg-slate-800 text-xs text-slate-300"
-                    >
-                      <Compass className="h-3.5 w-3.5 mr-1 text-primary" />
-                      Alterar localização
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Logo depois os campos: CEP, RUA, BAIRRO, NUMERO e TELEFONE PRA CONTATO */}
-              <div className="border-t border-slate-800/80 pt-4 space-y-3">
-
-                {/* CEP e RUA */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <Label htmlFor="chk-cep" className="text-xs font-bold text-foreground">
-                      CEP *
-                    </Label>
-                    <Input
-                      id="chk-cep"
-                      required
-                      value={cep}
-                      maxLength={9}
-                      onChange={(e) => setCep(e.target.value)}
-                      placeholder="78000-000"
-                      className="mt-1 text-sm font-mono"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="chk-rua" className="text-xs font-bold text-foreground">
-                      RUA *
-                    </Label>
-                    <Input
-                      id="chk-rua"
-                      required
-                      value={rua}
-                      onChange={(e) => setRua(e.target.value)}
-                      placeholder="Nome da rua / avenida"
-                      className="mt-1 text-sm"
-                    />
-                  </div>
                 </div>
+              )}
 
-                {/* BAIRRO, NÚMERO e TELEFONE PRA CONTATO */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <Label htmlFor="chk-bairro" className="text-xs font-bold text-foreground">
-                      BAIRRO *
-                    </Label>
-                    <Input
-                      id="chk-bairro"
-                      required
-                      value={bairro}
-                      onChange={(e) => setBairro(e.target.value)}
-                      placeholder="Bairro"
-                      className="mt-1 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="chk-numero" className="text-xs font-bold text-foreground">
-                      NÚMERO *
-                    </Label>
-                    <Input
-                      id="chk-numero"
-                      required
-                      value={numero}
-                      onChange={(e) => setNumero(e.target.value)}
-                      placeholder="Ex.: 123"
-                      className="mt-1 text-sm font-semibold"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="chk-phone" className="text-xs font-bold text-foreground">
-                      TELEFONE PRA CONTATO *
-                    </Label>
-                    <Input
-                      id="chk-phone"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="(65) 99999-9999"
-                      className="mt-1 text-sm"
-                    />
-                  </div>
-                </div>
+              {/* 4. Campo de Telefone de Contato (sempre presente e obrigatório) */}
+              <div className="border-t border-slate-800/80 pt-3">
+                <Label htmlFor="chk-phone" className="text-xs font-bold text-foreground">
+                  TELEFONE PRA CONTATO *
+                </Label>
+                <Input
+                  id="chk-phone"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(65) 99999-9999"
+                  className="mt-1 text-sm max-w-sm"
+                />
               </div>
             </section>
 

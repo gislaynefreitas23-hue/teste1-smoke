@@ -2,6 +2,11 @@ import { MessageCircle, ShieldCheck, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WHATSAPP_NUMBER } from "@/lib/brasa";
 import { useStoreSettings } from "@/lib/store-settings";
+import {
+  buildWhatsAppUrl,
+  openWhatsAppExternal,
+  isRunningInIframe,
+} from "@/lib/whatsapp";
 
 interface WhatsAppOrderSectionProps {
   className?: string;
@@ -14,9 +19,8 @@ export function WhatsAppOrderSection({
 }: WhatsAppOrderSectionProps) {
   const { settings } = useStoreSettings();
   const rawNumber = settings.whatsappNumber || WHATSAPP_NUMBER;
-  const cleanNumber = rawNumber.replace(/\D/g, "");
   const msg = defaultMessage || settings.whatsappMessage || "Olá! Gostaria de fazer um pedido.";
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${encodeURIComponent(msg)}`;
+  const whatsappUrl = buildWhatsAppUrl(rawNumber, msg);
 
   return (
     <section
@@ -72,12 +76,19 @@ export function WhatsAppOrderSection({
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Fazer pedido pelo WhatsApp oficial da Pantanal Smoke"
+              onClick={(e) => openWhatsAppExternal(whatsappUrl, e)}
               className="flex items-center justify-center gap-2.5"
             >
               <MessageCircle className="h-5 w-5 fill-current" aria-hidden="true" />
               <span>Peça agora!</span>
             </a>
           </Button>
+
+          {isRunningInIframe() && (
+            <p className="mt-2 text-center text-[10px] text-emerald-400/80">
+              Abre diretamente em uma nova aba fora da prévia
+            </p>
+          )}
         </div>
       </div>
     </section>

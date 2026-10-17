@@ -51,7 +51,7 @@ export function AgeGate() {
               </Button>
             </div>
             <p className="mt-6 text-xs text-muted-foreground">
-              Venda proibida para menores de 18 anos. Não vendemos cigarros eletrônicos.
+              Venda proibida para menores de 18 anos.
             </p>
           </>
         )}

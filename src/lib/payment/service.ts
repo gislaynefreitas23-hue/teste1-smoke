@@ -58,12 +58,40 @@ export async function calculateOrderSummary(
 
   // Busca produtos ativos no banco para garantir preços verdadeiros
   const ids = rawItems.map((i) => i.id);
-  const { data: dbProducts, error } = await supabase
-    .from("products")
-    .select("id, name, price, active")
-    .in("id", ids);
+  const targetCity = cityId === "sao-paulo" ? "sao-paulo" : "cuiaba";
 
-  if (error || !dbProducts) {
+  let dbProducts: any[] = [];
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select(`
+        id,
+        name,
+        price,
+        active,
+        product_city_inventories (
+          city_id,
+          price,
+          stock,
+          active
+        )
+      `)
+      .in("id", ids);
+
+    if (!error && data) {
+      dbProducts = data;
+    } else {
+      throw error;
+    }
+  } catch {
+    const { data } = await supabase
+      .from("products")
+      .select("id, name, price, active")
+      .in("id", ids);
+    dbProducts = data ?? [];
+  }
+
+  if (!dbProducts || dbProducts.length === 0) {
     throw new Error("Não foi possível validar os produtos do catálogo.");
   }
 
@@ -76,8 +104,18 @@ export async function calculateOrderSummary(
       throw new Error("Um ou mais produtos selecionados não estão mais disponíveis.");
     }
 
+    // Procura inventário específico da cidade
+    const inventories = Array.isArray(dbProduct.product_city_inventories)
+      ? dbProduct.product_city_inventories
+      : [];
+    const cityInv = inventories.find((inv: any) => inv.city_id === targetCity);
+
+    if (cityInv && cityInv.active === false) {
+      throw new Error(`O produto "${dbProduct.name}" não está disponível em ${targetCity === "sao-paulo" ? "São Paulo" : "Cuiabá"}.`);
+    }
+
+    const price = cityInv ? Number(cityInv.price) : Number(dbProduct.price);
     const qty = Math.max(1, Math.floor(Number(item.qty) || 1));
-    const price = Number(dbProduct.price);
     subtotal += price * qty;
 
     verifiedItems.push({
@@ -89,7 +127,7 @@ export async function calculateOrderSummary(
   }
 
   // Taxa de entrega oficial
-  const deliveryFee = cityId === "cuiaba" ? 10.0 : 0.0;
+  const deliveryFee = targetCity === "cuiaba" ? 10.0 : 0.0;
 
   // Aplicação segura de cashback
   let cashbackUsed = 0;
@@ -171,12 +209,13 @@ export async function processCheckout(
   if (userId) {
     try {
       const dbPayload = summary.verifiedItems.map((i) => ({ id: i.id, qty: i.qty }));
-      const { data, error } = await supabase.rpc("place_order", {
+      const { data, error } = await (supabase.rpc as any)("place_order", {
         _items: dbPayload,
         _use_cashback: payload.useCashback,
         _name: payload.customer.name,
         _phone: payload.customer.phone,
         _address: formattedAddress,
+        _city_id: payload.selectedCityId || "cuiaba",
       });
 
       if (!error && data && (data as { id?: string }).id) {

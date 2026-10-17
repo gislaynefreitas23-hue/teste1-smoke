@@ -17,22 +17,27 @@ export type CartItem = {
   name: string;
   price: number;
   qty: number;
+  cityId?: "cuiaba" | "sao-paulo";
+  stock?: number;
 };
 
-type CartContextValue = {
+export type CartContextValue = {
   items: CartItem[];
-  add: (item: { id: string; name: string; price: number }) => void;
+  add: (item: { id: string; name: string; price: number; cityId?: "cuiaba" | "sao-paulo"; stock?: number }) => boolean;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
   count: number;
   subtotal: number;
+  cartCityId: ("cuiaba" | "sao-paulo") | null;
+  cityConflictWarning: string | null;
+  dismissCityConflictWarning: () => void;
   lastAddedProduct: string | null;
   isNotificationVisible: boolean;
   dismissNotification: () => void;
 };
 
-const CartContext = createContext<CartContextValue | null>(null);
+export const CartContext = createContext<CartContextValue | null>(null);
 
 function readStoredCart(): CartItem[] {
   try {
@@ -49,7 +54,14 @@ function readStoredCart(): CartItem[] {
           Number.isFinite(Number(i.price)) &&
           Number(i.qty) > 0,
       )
-      .map((i) => ({ ...i, price: Number(i.price), qty: Number(i.qty) }));
+      .map((i) => ({
+        id: i.id,
+        name: i.name,
+        price: Number(i.price),
+        qty: Number(i.qty),
+        cityId: i.cityId === "sao-paulo" || i.cityId === "cuiaba" ? i.cityId : undefined,
+        stock: Number.isFinite(Number(i.stock)) ? Number(i.stock) : undefined,
+      }));
   } catch {
     return [];
   }
@@ -62,10 +74,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Estado da notificação fixa inferior
   const [lastAddedProduct, setLastAddedProduct] = useState<string | null>(null);
   const [isNotificationVisible, setIsNotificationVisible] = useState(false);
+  const [cityConflictWarning, setCityConflictWarning] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const dismissNotification = useCallback(() => {
     setIsNotificationVisible(false);
+  }, []);
+
+  const dismissCityConflictWarning = useCallback(() => {
+    setCityConflictWarning(null);
   }, []);
 
   const triggerNotification = useCallback((productName: string) => {
@@ -100,21 +117,61 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
   }, []);
 
+  const itemsRef = useRef<CartItem[]>(items);
   useEffect(() => {
-    if (!loaded) return;
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-  }, [items, loaded]);
+    itemsRef.current = items;
+  }, [items]);
 
   const add = useCallback(
-    (item: { id: string; name: string; price: number }) => {
-      setItems((current) => {
-        const existing = current.find((i) => i.id === item.id);
-        if (existing) {
-          return current.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
+    (item: { id: string; name: string; price: number; cityId?: "cuiaba" | "sao-paulo"; stock?: number }): boolean => {
+      const current = itemsRef.current;
+
+      // 1. Verifica se já existem produtos de outra cidade no carrinho
+      const existingCity = current.find((i) => i.cityId)?.cityId;
+      if (existingCity && item.cityId && existingCity !== item.cityId) {
+        const currentCityName = existingCity === "cuiaba" ? "Cuiabá" : "São Paulo";
+        const newCityName = item.cityId === "cuiaba" ? "Cuiabá" : "São Paulo";
+        setCityConflictWarning(
+          `Seu carrinho contém produtos de ${currentCityName}. Não é permitido misturar itens de cidades diferentes no mesmo pedido. Para comprar em ${newCityName}, limpe o carrinho ou conclua o pedido atual.`,
+        );
+        return false;
+      }
+
+      const existing = current.find((i) => i.id === item.id);
+      const maxStock = typeof item.stock === "number" ? item.stock : 9999;
+
+      if (existing) {
+        if (existing.qty >= maxStock) {
+          triggerNotification(`${item.name} (limite de estoque atingido)`);
+          return true;
         }
-        return [...current, { ...item, qty: 1 }];
-      });
+        const updated = current.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
+        itemsRef.current = updated;
+        setItems(updated);
+        triggerNotification(item.name);
+        return true;
+      }
+
+      if (maxStock <= 0) {
+        triggerNotification(`${item.name} (esgotado)`);
+        return false;
+      }
+
+      const updated = [
+        ...current,
+        {
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          qty: 1,
+          cityId: item.cityId,
+          stock: item.stock,
+        },
+      ];
+      itemsRef.current = updated;
+      setItems(updated);
       triggerNotification(item.name);
+      return true;
     },
     [triggerNotification],
   );
@@ -123,7 +180,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((current) =>
       qty <= 0
         ? current.filter((i) => i.id !== id)
-        : current.map((i) => (i.id === id ? { ...i, qty } : i)),
+        : current.map((i) => {
+            if (i.id !== id) return i;
+            const max = typeof i.stock === "number" ? i.stock : 9999;
+            return { ...i, qty: Math.min(qty, max) };
+          }),
     );
   }, []);
 
@@ -131,7 +192,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setItems((current) => current.filter((i) => i.id !== id));
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    setItems([]);
+    setCityConflictWarning(null);
+  }, []);
+
+  const cartCityId = useMemo(() => {
+    return items.find((i) => i.cityId)?.cityId || null;
+  }, [items]);
 
   const value = useMemo<CartContextValue>(
     () => ({
@@ -142,11 +210,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
       clear,
       count: items.reduce((sum, i) => sum + i.qty, 0),
       subtotal: items.reduce((sum, i) => sum + i.qty * i.price, 0),
+      cartCityId,
+      cityConflictWarning,
+      dismissCityConflictWarning,
       lastAddedProduct,
       isNotificationVisible,
       dismissNotification,
     }),
-    [items, add, setQty, remove, clear, lastAddedProduct, isNotificationVisible, dismissNotification],
+    [
+      items,
+      add,
+      setQty,
+      remove,
+      clear,
+      cartCityId,
+      cityConflictWarning,
+      dismissCityConflictWarning,
+      lastAddedProduct,
+      isNotificationVisible,
+      dismissNotification,
+    ],
   );
 
   return (
@@ -159,6 +242,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       />
     </CartContext.Provider>
   );
+}
+
+export function useSafeCart() {
+  return useContext(CartContext);
 }
 
 export function useCart() {

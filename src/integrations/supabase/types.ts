@@ -58,11 +58,73 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      customer_addresses: {
+        Row: {
+          bairro: string
+          cep: string
+          cidade: string
+          city_id: string
+          complemento: string
+          created_at: string
+          id: string
+          is_default: boolean
+          label: string
+          numero: string
+          ponto_referencia: string
+          rua: string
+          uf: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bairro: string
+          cep: string
+          cidade: string
+          city_id: string
+          complemento?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          numero: string
+          ponto_referencia?: string
+          rua: string
+          uf: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bairro?: string
+          cep?: string
+          cidade?: string
+          city_id?: string
+          complemento?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          label?: string
+          numero?: string
+          ponto_referencia?: string
+          rua?: string
+          uf?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
           address: string
           cashback_used: number
+          city_id: string
           created_at: string
           customer_name: string
           id: string
@@ -77,6 +139,7 @@ export type Database = {
         Insert: {
           address?: string
           cashback_used?: number
+          city_id?: string
           created_at?: string
           customer_name?: string
           id?: string
@@ -91,6 +154,7 @@ export type Database = {
         Update: {
           address?: string
           cashback_used?: number
+          city_id?: string
           created_at?: string
           customer_name?: string
           id?: string
@@ -108,6 +172,47 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_city_inventories: {
+        Row: {
+          active: boolean
+          city_id: string
+          created_at: string
+          id: string
+          price: number
+          product_id: string
+          stock: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          city_id: string
+          created_at?: string
+          id?: string
+          price: number
+          product_id: string
+          stock?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          city_id?: string
+          created_at?: string
+          id?: string
+          price?: number
+          product_id?: string
+          stock?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_city_inventories_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]

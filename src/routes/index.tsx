@@ -88,9 +88,9 @@ function Home() {
         </div>
         <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm">
           <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
-          <h2 className="mt-3 text-lg font-semibold text-white">Entrega Local em Cuiabá</h2>
+          <h2 className="mt-3 text-lg font-semibold text-white">100% Online, Estoque Local</h2>
           <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
-            Taxa fixa de {formatBRL(settings.deliveryFeeCuiaba)} para toda a cidade. Compre pelo site com checkout integrado ou peça pelo WhatsApp.
+            Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia.
           </p>
         </div>
       </section>

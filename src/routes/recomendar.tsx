@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { Sparkles } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Sparkles, MapPin } from "lucide-react";
 
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { productsQueryOptions } from "@/lib/brasa";
+import { useCity } from "@/lib/city";
 import {
   BUDGETS,
   EXPERIENCES,
@@ -36,7 +37,6 @@ export const Route = createFileRoute("/recomendar")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(productsQueryOptions()),
   component: Recomendar,
 });
 
@@ -86,7 +86,9 @@ function Pills({
 }
 
 function Recomendar() {
-  const { data: products } = useSuspenseQuery(productsQueryOptions());
+  const { selectedCityId, openSelector } = useCity();
+  const currentCity = selectedCityId || "cuiaba";
+  const { data: products = [] } = useQuery(productsQueryOptions(currentCity));
   const [answers, setAnswers] = useState<Answers>(EMPTY);
   const [shown, setShown] = useState<Answers | null>(null);
 

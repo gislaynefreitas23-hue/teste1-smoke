@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { MapPin, Minus, Plus, ShoppingBag, Sparkles, Trash2, ShieldCheck, ArrowRight } from "lucide-react";
+import {
+  MapPin,
+  MessageCircle,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Sparkles,
+  Trash2,
+  ShieldCheck,
+  ArrowRight,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { CASHBACK_RATE, WHATSAPP_NUMBER, formatBRL } from "@/lib/brasa";
+import { buildWhatsAppUrl, openWhatsAppExternal } from "@/lib/whatsapp";
 import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 import { useAuthSession } from "@/lib/useAuth";
@@ -34,7 +45,16 @@ export const Route = createFileRoute("/carrinho")({
 });
 
 function Carrinho() {
-  const { items, setQty, remove, subtotal } = useCart();
+  const {
+    items,
+    setQty,
+    remove,
+    clear,
+    subtotal,
+    cartCityId,
+    cityConflictWarning,
+    dismissCityConflictWarning,
+  } = useCart();
   const { session } = useAuthSession();
   const { selectedCityId, openSelector } = useCity();
 
@@ -57,42 +77,44 @@ function Carrinho() {
     };
   }, [session]);
 
-  const isCuiaba = selectedCityId === "cuiaba";
+  const effectiveCity = cartCityId || selectedCityId || "cuiaba";
+  const isCuiaba = effectiveCity === "cuiaba";
+  const cityName = isCuiaba ? "Cuiabá — MT" : "São Paulo — SP";
   const deliveryFee = isCuiaba ? TAXA_ENTREGA_CUIABA : 0;
   const applied = useCashback && session ? Math.min(balance, subtotal) : 0;
   const total = subtotal + deliveryFee - applied;
   const earning = Math.round((subtotal - applied) * CASHBACK_RATE * 100) / 100;
 
-  // Envio direto pelo WhatsApp caso o cliente prefira
-  function sendOrderViaWhatsApp() {
+  const itemsLines = items
+    .map((i) => `• ${i.qty}x ${i.name} — ${formatBRL(i.price)} cada (${formatBRL(i.price * i.qty)})`)
+    .join("\n");
+
+  const whatsAppOrderText = [
+    "🔥 *Olá! Quero fechar este pedido na Pantanal Smoke:*",
+    "",
+    `📍 *Cidade de atendimento:* ${cityName}`,
+    "",
+    "*Itens do pedido:*",
+    itemsLines,
+    "",
+    `*Subtotal dos produtos:* ${formatBRL(subtotal)}`,
+    isCuiaba ? `*Taxa fixa de entrega (Cuiabá):* ${formatBRL(deliveryFee)}` : "*Envio:* A combinar / Expresso",
+    applied > 0 ? `*Cashback aplicado:* -${formatBRL(applied)}` : "",
+    `*Total:* ${formatBRL(total)}`,
+    "",
+    isCuiaba ? "🕒 *Entrega rápida em Cuiabá · Taxa fixa R$ 10,00*" : "📦 *Envio expresso para São Paulo*",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const whatsAppOrderUrl = buildWhatsAppUrl(WHATSAPP_NUMBER, whatsAppOrderText);
+
+  // Envio direto pelo WhatsApp escapando de iframes do Lovable
+  function sendOrderViaWhatsApp(e?: React.SyntheticEvent) {
     setError(null);
     setSending(true);
     try {
-      const itemsLines = items
-        .map((i) => `• ${i.qty}x ${i.name} — ${formatBRL(i.price)} cada (${formatBRL(i.price * i.qty)})`)
-        .join("\n");
-
-      const text = [
-        "🔥 *Olá! Quero fechar este pedido na Pantanal Smoke:*",
-        "",
-        "*Itens do pedido:*",
-        itemsLines,
-        "",
-        `*Subtotal dos produtos:* ${formatBRL(subtotal)}`,
-        isCuiaba ? `*Taxa de entrega (Cuiabá):* ${formatBRL(deliveryFee)}` : "",
-        applied > 0 ? `*Cashback aplicado:* -${formatBRL(applied)}` : "",
-        `*Total:* ${formatBRL(total)}`,
-        "",
-        isCuiaba ? "🕒 *Entrega local · Atendimento das 10h às 19h*" : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
-
-      window.open(
-        `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`,
-        "_blank",
-        "noopener",
-      );
+      openWhatsAppExternal(whatsAppOrderUrl, e);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível abrir o WhatsApp.");
     } finally {
@@ -117,7 +139,39 @@ function Carrinho() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10">
-      <h1 className="text-3xl font-bold">Carrinho de compras</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-4">
+        <div>
+          <h1 className="text-3xl font-bold">Carrinho de compras</h1>
+          <p className="text-xs text-muted-foreground mt-1">
+            Revise seus produtos selecionados para entrega em <strong className="text-foreground">{cityName}</strong>.
+          </p>
+        </div>
+
+        <div className="inline-flex items-center gap-2 rounded-2xl border border-primary/30 bg-card/80 px-3.5 py-1.5 text-xs">
+          <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="font-semibold text-white">{cityName}</span>
+          <button
+            type="button"
+            onClick={() => openSelector()}
+            className="text-[11px] font-semibold text-primary underline underline-offset-2 ml-1 cursor-pointer"
+          >
+            Alterar
+          </button>
+        </div>
+      </div>
+
+      {cityConflictWarning && (
+        <div className="mt-4 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+          <span>{cityConflictWarning}</span>
+          <button
+            type="button"
+            onClick={dismissCityConflictWarning}
+            className="text-amber-400 hover:text-white font-bold ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <p className="mt-2 text-muted-foreground">
         Revise seus itens antes de prosseguir para o pagamento e endereço de entrega.
       </p>
@@ -300,13 +354,20 @@ function Carrinho() {
               </Button>
 
               <Button
+                asChild
                 variant="outline"
-                className="w-full border-slate-700 hover:bg-slate-800 text-xs text-muted-foreground hover:text-foreground"
+                className="w-full border-slate-700 hover:bg-slate-800 text-xs text-muted-foreground hover:text-foreground gap-1.5"
                 size="sm"
-                onClick={sendOrderViaWhatsApp}
-                disabled={sending}
               >
-                {sending ? "Abrindo..." : "Ou pedir direto pelo WhatsApp"}
+                <a
+                  href={whatsAppOrderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={sendOrderViaWhatsApp}
+                >
+                  <MessageCircle className="h-3.5 w-3.5 text-emerald-400" />
+                  <span>{sending ? "Abrindo..." : "Ou pedir direto pelo WhatsApp"}</span>
+                </a>
               </Button>
             </div>
 

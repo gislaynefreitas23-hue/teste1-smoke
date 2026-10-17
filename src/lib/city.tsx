@@ -9,6 +9,8 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 
+import { useSafeCart } from "@/lib/cart";
+
 export type CityId = "cuiaba" | "sao-paulo";
 
 export type CityOption = {
@@ -41,7 +43,7 @@ export const CITY_STORAGE_KEY = "pantanal-selected-city";
 type CityContextValue = {
   selectedCity: CityOption | null;
   selectedCityId: CityId | null;
-  selectCity: (id: CityId) => void;
+  selectCity: (id: CityId, force?: boolean) => void;
   clearCity: () => void;
   isSelectorOpen: boolean;
   setIsSelectorOpen: (open: boolean) => void;
@@ -50,6 +52,9 @@ type CityContextValue = {
   requireCityOrNavigate: (destination: string, e?: React.MouseEvent) => boolean;
   pendingDestination: string | null;
   isLoaded: boolean;
+  pendingCitySwitch: CityId | null;
+  confirmCitySwitch: () => void;
+  cancelCitySwitch: () => void;
 };
 
 const CityContext = createContext<CityContextValue | null>(null);
@@ -68,10 +73,12 @@ function readStoredCity(): CityId | null {
 
 export function CityProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const safeCart = useSafeCart();
   const [cityId, setCityId] = useState<CityId | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [pendingDestination, setPendingDestination] = useState<string | null>(null);
+  const [pendingCitySwitch, setPendingCitySwitch] = useState<CityId | null>(null);
 
   useEffect(() => {
     const stored = readStoredCity();
@@ -89,9 +96,10 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const closeSelector = useCallback(() => {
     setIsSelectorOpen(false);
     setPendingDestination(null);
+    setPendingCitySwitch(null);
   }, []);
 
-  const selectCity = useCallback(
+  const applyCitySelection = useCallback(
     (id: CityId) => {
       setCityId(id);
       try {
@@ -100,6 +108,7 @@ export function CityProvider({ children }: { children: ReactNode }) {
         // storage unavailable
       }
       setIsSelectorOpen(false);
+      setPendingCitySwitch(null);
 
       if (pendingDestination) {
         const dest = pendingDestination;
@@ -109,6 +118,31 @@ export function CityProvider({ children }: { children: ReactNode }) {
     },
     [pendingDestination, navigate],
   );
+
+  const selectCity = useCallback(
+    (id: CityId, force = false) => {
+      // Se houver produtos no carrinho e a cidade for alterada, solicita confirmação
+      if (!force && safeCart && safeCart.items.length > 0 && cityId && cityId !== id) {
+        setPendingCitySwitch(id);
+        setIsSelectorOpen(true);
+        return;
+      }
+
+      applyCitySelection(id);
+    },
+    [safeCart, cityId, applyCitySelection],
+  );
+
+  const confirmCitySwitch = useCallback(() => {
+    if (pendingCitySwitch) {
+      safeCart?.clear();
+      applyCitySelection(pendingCitySwitch);
+    }
+  }, [pendingCitySwitch, safeCart, applyCitySelection]);
+
+  const cancelCitySwitch = useCallback(() => {
+    setPendingCitySwitch(null);
+  }, []);
 
   const clearCity = useCallback(() => {
     setCityId(null);
@@ -150,6 +184,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       requireCityOrNavigate,
       pendingDestination,
       isLoaded,
+      pendingCitySwitch,
+      confirmCitySwitch,
+      cancelCitySwitch,
     }),
     [
       selectedCity,
@@ -163,6 +200,9 @@ export function CityProvider({ children }: { children: ReactNode }) {
       requireCityOrNavigate,
       pendingDestination,
       isLoaded,
+      pendingCitySwitch,
+      confirmCitySwitch,
+      cancelCitySwitch,
     ],
   );
 

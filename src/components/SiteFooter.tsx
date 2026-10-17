@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
 
 import { SITE_NAME, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { openWhatsAppExternal } from "@/lib/whatsapp";
 import { useCity } from "@/lib/city";
 
 export function SiteFooter() {
@@ -72,6 +73,9 @@ export function SiteFooter() {
             Todo pedido é confirmado pelo WhatsApp{" "}
             <a
               href={`https://wa.me/${WHATSAPP_NUMBER}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => openWhatsAppExternal(`https://wa.me/${WHATSAPP_NUMBER}`, e)}
               className="text-primary hover:underline"
             >
               +55 65 99921-0066

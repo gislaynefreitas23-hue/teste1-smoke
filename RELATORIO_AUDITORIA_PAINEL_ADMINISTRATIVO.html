@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório de Auditoria — Pantanal Smoke</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #a855f7;
+      --primary-light: #c084fc;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 {
+      font-size: 28px;
+      color: #fff;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    h2 {
+      font-size: 20px;
+      color: var(--primary-light);
+      margin-top: 32px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    h3 {
+      font-size: 16px;
+      color: #e2e8f0;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+    p, li {
+      font-size: 14px;
+      color: #cbd5e1;
+      margin-bottom: 10px;
+    }
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+    .meta-box {
+      background: rgba(168, 85, 247, 0.1);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      padding: 16px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-critical { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid #ef4444; }
+    .badge-medium { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+    .badge-low { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 13px;
+    }
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: #0f172a;
+      color: #fff;
+    }
+    tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    code {
+      background: #0f172a;
+      color: var(--primary-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    @media print {
+      body { background: #fff; color: #000; padding: 0; }
+      .container { border: none; box-shadow: none; padding: 0; }
+      h1, h2, h3 { color: #000; }
+      p, li, td { color: #222; }
+      code { background: #eee; color: #000; }
+      th { background: #ddd; color: #000; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Relatório de Auditoria: Painel Administrativo</h1>
+    <div class="meta-box">
+      <strong>Projeto:</strong> Pantanal Smoke &nbsp;|&nbsp; 
+      <strong>Data:</strong> 16 de Outubro de 2026 &nbsp;|&nbsp; 
+      <strong>Ambiente:</strong> Diagnóstico Estrito de Segurança (Somente Leitura)
+    </div>
+
+    <h2>1. Login Administrativo</h2>
+    <p><strong>Arquivo inspecionado:</strong> <code>src/routes/admin.tsx</code> e <code>src/lib/store-settings.ts</code></p>
+    <ul>
+      <li><strong>Funcionamento atual:</strong> A rota <code>/admin</code> solicita e-mail e senha. A validação é feita via função <code>loginAdmin()</code> comparando com uma constante local. Se correto, salva uma chave de sessão no <code>localStorage</code>.</li>
+      <li><strong>Credenciais no código:</strong> As credenciais estão escritas diretamente em <code>src/lib/store-settings.ts</code> (constante <code>ADMIN_CONFIG</code>). Como a aplicação roda no navegador, essas credenciais ficam legíveis nos scripts empacotados.</li>
+      <li><strong>Validação no servidor:</strong> Inexistente no momento. A validação é 100% feita no navegador (client-side).</li>
+      <li><strong>Falsificação de sessão:</strong> <span class="badge badge-critical">Crítico</span> Qualquer usuário pode abrir o console (F12) e criar a chave no <code>localStorage</code> para liberar o painel visualmente.</li>
+    </ul>
+
+    <h2>2. Recuperação de Senha por E-mail</h2>
+    <ul>
+      <li><strong>Opção "Esqueci minha senha":</strong> Não existe na tela de login administrativo.</li>
+      <li><strong>Disparo de link de recuperação:</strong> Inexistente para o administrador, pois o login não está conectado ao provedor de identidade oficial do Supabase.</li>
+      <li><strong>Requisitos para funcionamento:</strong> Ligar o login ao <code>supabase.auth.signInWithPassword()</code>, criar tela com <code>resetPasswordForEmail()</code> e configurar servidor SMTP personalizado no painel web do Supabase (para evitar bloqueios por taxa de envio).</li>
+    </ul>
+
+    <h2>3. Cadastro e Gerenciamento de Administradores</h2>
+    <p><strong>Arquivo inspecionado:</strong> <code>drizzle/migrations/0000_pantanal_smoke_schema.sql</code></p>
+    <ul>
+      <li><strong>Estrutura no banco:</strong> O banco possui a tabela <code>public.user_roles</code> e a função <code>has_role()</code> preparadas para isolar administradores de clientes comuns.</li>
+      <li><strong>Gerenciamento:</strong> Não existe tela visual para criar ou convidar novos administradores. A concessão precisa ser feita manualmente via comando SQL no console do Supabase.</li>
+    </ul>
+
+    <h2>4. Segurança e Permissões (RLS e Banco de Dados)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Tabela</th>
+          <th>Leitura (SELECT)</th>
+          <th>Escrita / Modificação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>products</strong></td>
+          <td>Pública para ativos; Admin para todos</td>
+          <td>Bloqueada para quem não tem sessão admin no Supabase</td>
+        </tr>
+        <tr>
+          <td><strong>orders</strong></td>
+          <td>Próprio cliente ou Admin</td>
+          <td>Atualização de status bloqueada para quem não tem JWT admin</td>
+        </tr>
+        <tr>
+          <td><strong>cashback_entries</strong></td>
+          <td>Próprio cliente ou Admin</td>
+          <td>Protegida contra inserção manual</td>
+        </tr>
+        <tr>
+          <td><strong>store_settings</strong></td>
+          <td>Pública para o site funcionar</td>
+          <td>Exige sessão autenticada de admin no banco</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Chaves de API:</strong> A chave do frontend (<code>VITE_SUPABASE_PUBLISHABLE_KEY</code>) é pública por padrão e está correta. A chave mestre (<code>SUPABASE_SERVICE_ROLE_KEY</code>) está devidamente protegida no servidor.</p>
+
+    <h2>5. Recuperação e Controle do Site</h2>
+    <ul>
+      <li><strong>Recuperação do código:</strong> O código-fonte está 100% versionado no repositório GitHub (<code>gislaynefreitas23-hue/teste1-smoke</code>) na branch <code>main</code>.</li>
+      <li><strong>Dependência do Supabase:</strong> Catálogo cadastrado pelo painel, fotos enviadas por upload, histórico de pedidos e cashback dos clientes residem no Supabase.</li>
+      <li><strong>Backups:</strong> O plano gratuito do Supabase não possui backup automático com restauração em um clique. Recomenda-se realizar exportações periódicas ou habilitar rotina de backup.</li>
+    </ul>
+
+    <h2>6. Matriz de Classificação de Riscos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Classificação</th>
+          <th>Situação / Vulnerabilidade</th>
+          <th>Ação Recomendada</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-critical">Crítico</span></td>
+          <td>Senha administrativa fixa no código do frontend</td>
+          <td>Migrar login para Supabase Auth nativo</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-critical">Crítico</span></td>
+          <td>Sessão baseada apenas em chave no localStorage</td>
+          <td>Validar sessão com JWT emitido pelo servidor</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-medium">Médio</span></td>
+          <td>Sessão atual do painel não autentica com RLS</td>
+          <td>Vincular o usuário na tabela user_roles</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-medium">Médio</span></td>
+          <td>Falta de recuperação de senha por e-mail no painel</td>
+          <td>Implementar resetPasswordForEmail com SMTP</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-low">Baixo</span></td>
+          <td>Ausência de rotina externa automatizada de backup</td>
+          <td>Agendar exportações periódicas do banco</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="footer">
+      Pantanal Smoke — Relatório emitido para controle técnico e alinhamento de segurança.
+    </div>
+  </div>
+</body>
+</html>

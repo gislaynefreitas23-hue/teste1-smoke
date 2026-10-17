@@ -1082,33 +1082,106 @@ function BannersManagement({
 // ==========================================
 // COMPONENTE: GERENCIADOR DE PRODUTOS
 // ==========================================
+// ==========================================
+// COMPONENTE: GERENCIADOR DE PRODUTOS
+// ==========================================
 function ProductsManagement() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
 
-  const { data: products = [], isLoading } = useQuery({
+  const { data: rawProducts = [], isLoading } = useQuery({
     queryKey: ["admin-products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("category")
-        .order("name");
-      if (error) throw error;
-      return data ?? [];
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            *,
+            product_city_inventories (
+              id,
+              city_id,
+              price,
+              stock,
+              active
+            )
+          `)
+          .order("category")
+          .order("name");
+
+        if (!error && data) return data;
+        throw error;
+      } catch {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("category")
+          .order("name");
+
+        if (error) throw error;
+        return data ?? [];
+      }
     },
   });
+
+  // Filtra produtos de acordo com o seletor de cidade
+  const products = rawProducts.filter((p: any) => {
+    if (selectedCityFilter === "all") return true;
+
+    const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
+    if (inventories.length === 0) return true; // Mostra fallback
+
+    const inv = inventories.find((i: any) => i.city_id === selectedCityFilter);
+    return inv ? inv.active === true : false;
+  });
+
+  function openEditProduct(p: any) {
+    const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
+    const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
+    const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
+
+    let availability: "both" | "cuiaba" | "sao-paulo" = "both";
+    if (cuiabaInv && spInv) {
+      if (cuiabaInv.active && !spInv.active) availability = "cuiaba";
+      else if (!cuiabaInv.active && spInv.active) availability = "sao-paulo";
+      else availability = "both";
+    } else if (cuiabaInv && !spInv) {
+      availability = "cuiaba";
+    } else if (!cuiabaInv && spInv) {
+      availability = "sao-paulo";
+    }
+
+    setDraft({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      description: p.description || "",
+      flavor_profile: p.flavor_profile || "",
+      intensity: p.intensity || "média",
+      image_url: p.image_url || "",
+      active: p.active ?? true,
+      availability,
+      cuiaba_price: cuiabaInv ? String(cuiabaInv.price) : String(p.price),
+      cuiaba_stock: cuiabaInv ? Number(cuiabaInv.stock) : 15,
+      sao_paulo_price: spInv ? String(spInv.price) : String(p.price),
+      sao_paulo_stock: spInv ? Number(spInv.stock) : 15,
+    });
+  }
 
   async function handleSaveProduct(e: React.FormEvent) {
     e.preventDefault();
     if (!draft) return;
     setBusy(true);
 
+    const cuiabaPrice = Number(String(draft.cuiaba_price).replace(",", ".")) || 0;
+    const saoPauloPrice = Number(String(draft.sao_paulo_price).replace(",", ".")) || 0;
+    const basePrice = draft.availability === "sao-paulo" ? saoPauloPrice : cuiabaPrice;
+
     const payload = {
       name: draft.name,
       category: draft.category,
-      price: Number(String(draft.price).replace(",", ".")) || 0,
+      price: basePrice,
       description: draft.description || "",
       flavor_profile: draft.flavor_profile || "",
       intensity: draft.intensity || "média",
@@ -1116,10 +1189,47 @@ function ProductsManagement() {
       image_url: draft.image_url || "",
     };
 
-    if (draft.id) {
-      await supabase.from("products").update(payload).eq("id", draft.id);
+    let productId = draft.id;
+    if (productId) {
+      await supabase.from("products").update(payload).eq("id", productId);
     } else {
-      await supabase.from("products").insert(payload);
+      const { data: newProd, error: insertErr } = await supabase
+        .from("products")
+        .insert(payload)
+        .select("id")
+        .single();
+      if (!insertErr && newProd) {
+        productId = newProd.id;
+      }
+    }
+
+    // Upsert dos inventários independentes de cada cidade
+    if (productId) {
+      try {
+        const isCuiabaActive = draft.active && (draft.availability === "both" || draft.availability === "cuiaba");
+        const isSpActive = draft.active && (draft.availability === "both" || draft.availability === "sao-paulo");
+
+        await (supabase.from("product_city_inventories") as any).upsert([
+          {
+            product_id: productId,
+            city_id: "cuiaba",
+            price: cuiabaPrice,
+            stock: Number(draft.cuiaba_stock) || 0,
+            active: isCuiabaActive,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            product_id: productId,
+            city_id: "sao-paulo",
+            price: saoPauloPrice,
+            stock: Number(draft.sao_paulo_stock) || 0,
+            active: isSpActive,
+            updated_at: new Date().toISOString(),
+          },
+        ], { onConflict: "product_id,city_id" });
+      } catch (invErr) {
+        console.warn("Aviso ao sincronizar product_city_inventories:", invErr);
+      }
     }
 
     setBusy(false);
@@ -1137,10 +1247,12 @@ function ProductsManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Catálogo de Produtos</h2>
-          <p className="text-xs text-muted-foreground">Cadastre novos produtos, altere preços e pause itens fora de estoque.</p>
+          <h2 className="text-xl font-bold text-white">Catálogo de Produtos Multicidade</h2>
+          <p className="text-xs text-muted-foreground">
+            Gerencie preços, estoques e disponibilidades independentes para Cuiabá e São Paulo.
+          </p>
         </div>
 
         <Button
@@ -1148,30 +1260,78 @@ function ProductsManagement() {
             setDraft({
               name: "",
               category: "Essência",
-              price: "44.90",
               description: "",
               flavor_profile: "Frutado",
               intensity: "média",
               active: true,
               image_url: "",
+              availability: "both",
+              cuiaba_price: "44.90",
+              cuiaba_stock: 15,
+              sao_paulo_price: "49.90",
+              sao_paulo_stock: 15,
             })
           }
-          className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow"
         >
           <Plus className="h-4 w-4" />
           Novo Produto
         </Button>
       </div>
 
-      {draft && (
-        <form onSubmit={handleSaveProduct} className="rounded-2xl border border-primary/30 bg-card/90 p-5 space-y-4">
-          <h3 className="text-sm font-bold text-white border-b border-slate-800 pb-2">
-            {draft.id ? "Editar Produto" : "Cadastrar Novo Produto"}
-          </h3>
+      {/* Seletor / Filtro de Cidade do Painel */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
+        <span className="text-xs font-semibold text-muted-foreground mr-1">Filtrar por praça:</span>
+        <button
+          type="button"
+          onClick={() => setSelectedCityFilter("all")}
+          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+            selectedCityFilter === "all"
+              ? "bg-primary text-primary-foreground shadow-glow"
+              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          Todos os produtos ({rawProducts.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedCityFilter("cuiaba")}
+          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+            selectedCityFilter === "cuiaba"
+              ? "bg-primary text-primary-foreground shadow-glow"
+              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          📍 Cuiabá — MT
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedCityFilter("sao-paulo")}
+          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+            selectedCityFilter === "sao-paulo"
+              ? "bg-primary text-primary-foreground shadow-glow"
+              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+          }`}
+        >
+          📍 São Paulo — SP
+        </button>
+      </div>
 
+      {/* Formulário de Cadastro / Edição com Preços e Estoques Independentes */}
+      {draft && (
+        <form onSubmit={handleSaveProduct} className="rounded-2xl border border-primary/40 bg-card/90 p-5 space-y-5 shadow-2xl backdrop-blur-md">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              {draft.id ? "Editar Produto & Inventário por Cidade" : "Cadastrar Novo Produto Multicidade"}
+            </h3>
+            {draft.id && <span className="text-[11px] font-mono text-muted-foreground">{draft.id}</span>}
+          </div>
+
+          {/* Dados Principais do Produto */}
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <Label className="text-xs">Nome do Produto</Label>
+              <Label className="text-xs font-semibold">Nome do Produto</Label>
               <Input
                 required
                 value={draft.name}
@@ -1182,7 +1342,7 @@ function ProductsManagement() {
             </div>
 
             <div>
-              <Label className="text-xs">Categoria</Label>
+              <Label className="text-xs font-semibold">Categoria</Label>
               <Input
                 required
                 value={draft.category}
@@ -1193,20 +1353,7 @@ function ProductsManagement() {
             </div>
 
             <div>
-              <Label className="text-xs">Preço (R$)</Label>
-              <Input
-                required
-                value={draft.price}
-                onChange={(e) => setDraft({ ...draft, price: e.target.value })}
-                placeholder="39.90"
-                className="mt-1 text-sm font-semibold"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">Perfil de Sabor</Label>
+              <Label className="text-xs font-semibold">Perfil de Sabor</Label>
               <Input
                 value={draft.flavor_profile}
                 onChange={(e) => setDraft({ ...draft, flavor_profile: e.target.value })}
@@ -1214,9 +1361,11 @@ function ProductsManagement() {
                 className="mt-1 text-sm"
               />
             </div>
+          </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label className="text-xs">URL da Imagem</Label>
+              <Label className="text-xs font-semibold">URL da Imagem</Label>
               <Input
                 value={draft.image_url}
                 onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
@@ -1224,63 +1373,246 @@ function ProductsManagement() {
                 className="mt-1 text-sm"
               />
             </div>
+
+            <div>
+              <Label className="text-xs font-semibold">Descrição</Label>
+              <Input
+                value={draft.description}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                placeholder="Detalhes e características do produto..."
+                className="mt-1 text-sm"
+              />
+            </div>
           </div>
 
-          <div>
-            <Label className="text-xs">Descrição</Label>
-            <Textarea
-              rows={2}
-              value={draft.description}
-              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-              placeholder="Detalhes e características do produto..."
-              className="mt-1 text-sm"
-            />
+          {/* CONFIGURAÇÃO DE DISPONIBILIDADE POR CIDADE */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-4">
+            <div>
+              <Label className="text-xs font-bold text-white uppercase tracking-wider">
+                Disponibilidade do Produto nas Praças
+              </Label>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, availability: "both" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.availability === "both"
+                      ? "border-primary bg-primary/20 text-primary shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  ✓ Ambas as Cidades
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, availability: "cuiaba" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.availability === "cuiaba"
+                      ? "border-primary bg-primary/20 text-primary shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Somente Cuiabá
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, availability: "sao-paulo" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.availability === "sao-paulo"
+                      ? "border-primary bg-primary/20 text-primary shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Somente São Paulo
+                </button>
+              </div>
+            </div>
+
+            {/* PREÇOS E ESTOQUES INDEPENDENTES */}
+            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-800/80">
+              {/* Box Cuiabá */}
+              <div
+                className={`rounded-xl border p-3.5 space-y-3 transition-opacity ${
+                  draft.availability === "both" || draft.availability === "cuiaba"
+                    ? "border-purple-500/40 bg-purple-950/15"
+                    : "border-slate-800/60 bg-slate-900/30 opacity-40 pointer-events-none"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-purple-400" /> Cuiabá — MT
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {draft.availability === "sao-paulo" ? "Inativo nesta cidade" : "Ativo"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-300">Preço Cuiabá (R$)</Label>
+                    <Input
+                      value={draft.cuiaba_price}
+                      onChange={(e) => setDraft({ ...draft, cuiaba_price: e.target.value })}
+                      placeholder="89.90"
+                      className="mt-1 text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-300">Estoque Cuiabá (un.)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.cuiaba_stock}
+                      onChange={(e) => setDraft({ ...draft, cuiaba_stock: Number(e.target.value) })}
+                      placeholder="15"
+                      className="mt-1 text-xs font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Box São Paulo */}
+              <div
+                className={`rounded-xl border p-3.5 space-y-3 transition-opacity ${
+                  draft.availability === "both" || draft.availability === "sao-paulo"
+                    ? "border-cyan-500/40 bg-cyan-950/15"
+                    : "border-slate-800/60 bg-slate-900/30 opacity-40 pointer-events-none"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-cyan-400" /> São Paulo — SP
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {draft.availability === "cuiaba" ? "Inativo nesta cidade" : "Ativo"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-300">Preço SP (R$)</Label>
+                    <Input
+                      value={draft.sao_paulo_price}
+                      onChange={(e) => setDraft({ ...draft, sao_paulo_price: e.target.value })}
+                      placeholder="94.90"
+                      className="mt-1 text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[11px] font-semibold text-slate-300">Estoque SP (un.)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={draft.sao_paulo_stock}
+                      onChange={(e) => setDraft({ ...draft, sao_paulo_stock: Number(e.target.value) })}
+                      placeholder="15"
+                      className="mt-1 text-xs font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch checked={draft.active} onCheckedChange={(val) => setDraft({ ...draft, active: val })} />
-            <span className="text-xs text-slate-200">Visível na vitrine da loja</span>
-          </div>
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2">
+              <Switch checked={draft.active} onCheckedChange={(val) => setDraft({ ...draft, active: val })} />
+              <span className="text-xs text-slate-200">Produto ativo e disponível para venda</span>
+            </div>
 
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setDraft(null)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={busy} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold">
-              {busy ? "Salvando..." : "Salvar Produto"}
-            </Button>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setDraft(null)} className="text-xs">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={busy} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow text-xs">
+                {busy ? "Salvando..." : "Salvar Produto & Cidades"}
+              </Button>
+            </div>
           </div>
         </form>
       )}
 
+      {/* Grid de Produtos Cadastrados */}
       {isLoading ? (
         <p className="text-xs text-muted-foreground">Carregando catálogo...</p>
+      ) : products.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-card/40 p-10 text-center text-muted-foreground text-xs">
+          Nenhum produto cadastrado para a praça selecionada.
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p: any) => (
-            <div key={p.id} className="rounded-xl border border-slate-800 bg-card/60 p-4 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                    {p.active ? "Ativo" : "Inativo"}
-                  </span>
-                </div>
-                <h4 className="mt-1 font-bold text-white text-sm">{p.name}</h4>
-                <p className="mt-1 text-sm font-bold text-primary">{formatBRL(p.price)}</p>
-              </div>
+          {products.map((p: any) => {
+            const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
+            const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
+            const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
 
-              <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-slate-800 pt-2">
-                <Button size="sm" variant="ghost" onClick={() => setDraft(p)} className="text-xs gap-1">
-                  <Edit2 className="h-3.5 w-3.5 text-primary" />
-                  Editar
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(p.id, p.name)} className="text-xs text-destructive hover:text-destructive">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+            const isCuiabaActive = cuiabaInv ? cuiabaInv.active : true;
+            const isSpActive = spInv ? spInv.active : true;
+
+            const cuiabaPrice = cuiabaInv ? Number(cuiabaInv.price) : Number(p.price);
+            const cuiabaStock = cuiabaInv ? Number(cuiabaInv.stock) : 15;
+            const spPrice = spInv ? Number(spInv.price) : Number(p.price);
+            const spStock = spInv ? Number(spInv.stock) : 15;
+
+            return (
+              <div key={p.id} className="rounded-2xl border border-slate-800 bg-card/60 p-4 flex flex-col justify-between hover:border-primary/50 transition-colors">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+                      {p.active ? "Ativo no Site" : "Pausado"}
+                    </span>
+                  </div>
+
+                  <h4 className="mt-1 font-bold text-white text-sm">{p.name}</h4>
+                  {p.flavor_profile && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Sabor: {p.flavor_profile}</p>
+                  )}
+
+                  {/* Detalhes de Preço e Estoque por Cidade */}
+                  <div className="mt-3 space-y-1.5 border-t border-slate-800/80 pt-2.5 text-xs">
+                    <div className="flex items-center justify-between rounded-lg bg-slate-900/60 px-2 py-1">
+                      <span className="text-[11px] font-semibold text-purple-300 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-purple-400" /> Cuiabá:
+                      </span>
+                      {isCuiabaActive ? (
+                        <div className="flex items-center gap-2">
+                          <strong className="text-white font-bold">{formatBRL(cuiabaPrice)}</strong>
+                          <span className="text-[10px] text-muted-foreground">({cuiabaStock} un.)</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-rose-400 italic">Indisponível</span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg bg-slate-900/60 px-2 py-1">
+                      <span className="text-[11px] font-semibold text-cyan-300 flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-cyan-400" /> São Paulo:
+                      </span>
+                      {isSpActive ? (
+                        <div className="flex items-center gap-2">
+                          <strong className="text-white font-bold">{formatBRL(spPrice)}</strong>
+                          <span className="text-[10px] text-muted-foreground">({spStock} un.)</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-rose-400 italic">Indisponível</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-slate-800 pt-2">
+                  <Button size="sm" variant="ghost" onClick={() => openEditProduct(p)} className="text-xs gap-1">
+                    <Edit2 className="h-3.5 w-3.5 text-primary" />
+                    Editar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(p.id, p.name)} className="text-xs text-destructive hover:text-destructive">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1292,7 +1624,9 @@ function ProductsManagement() {
 // ==========================================
 function OrdersManagement() {
   const queryClient = useQueryClient();
-  const { data: orders = [], isLoading } = useQuery({
+  const [selectedCityFilter, setSelectedCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
+
+  const { data: rawOrders = [], isLoading } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -1305,6 +1639,12 @@ function OrdersManagement() {
     },
   });
 
+  const orders = rawOrders.filter((o: any) => {
+    if (selectedCityFilter === "all") return true;
+    const orderCity = (o.city_id || (o.address?.toLowerCase().includes("são paulo") ? "sao-paulo" : "cuiaba"));
+    return orderCity === selectedCityFilter;
+  });
+
   async function handleUpdateOrderStatus(id: string, newStatus: string) {
     await supabase.from("orders").update({ status: newStatus }).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
@@ -1312,31 +1652,81 @@ function OrdersManagement() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-white">Gestão de Pedidos & Entregas</h2>
-        <p className="text-xs text-muted-foreground">Acompanhe pedidos recebidos, aprove pagamentos e confirme entregas.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-white">Gestão de Pedidos & Entregas por Cidade</h2>
+          <p className="text-xs text-muted-foreground">
+            Acompanhe pedidos recebidos em Cuiabá e São Paulo, aprove pagamentos e despache entregas.
+          </p>
+        </div>
+
+        {/* Filtro de Cidade para Pedidos */}
+        <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("all")}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("cuiaba")}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "cuiaba" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
+            }`}
+          >
+            Cuiabá
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("sao-paulo")}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "sao-paulo" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
+            }`}
+          >
+            São Paulo
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
         <p className="text-xs text-muted-foreground">Carregando pedidos...</p>
       ) : orders.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-card/40 p-8 text-center text-muted-foreground text-sm">
-          Nenhum pedido registrado ainda.
+          Nenhum pedido registrado para a praça selecionada.
         </div>
       ) : (
         <div className="space-y-3">
           {orders.map((o: any) => {
             const cleanPhone = (o.phone || "").replace(/\D/g, "");
             const whatsLink = cleanPhone ? `https://wa.me/55${cleanPhone}?text=Ol%C3%A1%2C%20sobre%20seu%20pedido%20na%20Pantanal%20Smoke` : null;
+            const isSP = o.city_id === "sao-paulo" || o.address?.toLowerCase().includes("são paulo");
 
             return (
               <div key={o.id} className="rounded-2xl border border-slate-800 bg-card/60 p-5 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                  <div>
-                    <h3 className="font-bold text-white text-base">{o.customer_name || "Cliente Pantanal"}</h3>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(o.created_at).toLocaleString("pt-BR")} · Pedido #{o.id.slice(0, 8)}
-                    </p>
+                  <div className="flex items-center gap-2.5">
+                    {/* Badge da Cidade do Pedido */}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+                        isSP
+                          ? "border-cyan-500/40 bg-cyan-950/30 text-cyan-300"
+                          : "border-purple-500/40 bg-purple-950/30 text-purple-300"
+                      }`}
+                    >
+                      <MapPin className="h-3 w-3" />
+                      {isSP ? "São Paulo — SP" : "Cuiabá — MT"}
+                    </span>
+
+                    <div>
+                      <h3 className="font-bold text-white text-base">{o.customer_name || "Cliente Pantanal"}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(o.created_at).toLocaleString("pt-BR")} · Pedido #{o.id.slice(0, 8)}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-2">
