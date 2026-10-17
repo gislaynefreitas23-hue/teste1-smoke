@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { CASHBACK_RATE, WHATSAPP_NUMBER, formatBRL } from "@/lib/brasa";
+import { CASHBACK_RATE, WHATSAPP_NUMBER, formatBRL, resolveProductImage } from "@/lib/brasa";
 import { buildWhatsAppUrl, openWhatsAppExternal } from "@/lib/whatsapp";
-import { useCart } from "@/lib/cart";
+import { useCart, type CartItem } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 import { useAuthSession } from "@/lib/useAuth";
 
@@ -199,56 +199,14 @@ function Carrinho() {
       <div className="mt-8 grid gap-8 lg:grid-cols-12">
         {/* Coluna de Itens */}
         <section className="lg:col-span-7">
-          <ul className="divide-y divide-border rounded-2xl border bg-card">
+          <ul className="divide-y divide-border rounded-2xl border bg-card overflow-hidden">
             {items.map((item) => (
-              <li
+              <CartItemRow
                 key={item.id}
-                className="flex items-center justify-between gap-3 p-4 sm:p-5"
-              >
-                <div className="flex-1 truncate">
-                  <h3 className="font-semibold text-sm sm:text-base truncate">{item.name}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {formatBRL(item.price)} cada
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-lg border bg-background">
-                    <button
-                      type="button"
-                      onClick={() => setQty(item.id, item.qty - 1)}
-                      aria-label="Diminuir quantidade"
-                      className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <Minus className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="w-8 text-center text-xs font-semibold">
-                      {item.qty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setQty(item.id, item.qty + 1)}
-                      aria-label="Aumentar quantidade"
-                      className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <span className="w-20 text-right text-sm font-bold text-foreground">
-                    {formatBRL(item.price * item.qty)}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => remove(item.id)}
-                    aria-label={`Remover ${item.name}`}
-                    className="p-1.5 text-muted-foreground hover:text-destructive cursor-pointer transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </li>
+                item={item}
+                onSetQty={setQty}
+                onRemove={remove}
+              />
             ))}
           </ul>
 
@@ -379,5 +337,106 @@ function Carrinho() {
         </aside>
       </div>
     </main>
+  );
+}
+
+function CartItemRow({
+  item,
+  onSetQty,
+  onRemove,
+}: {
+  item: CartItem;
+  onSetQty: (id: string, qty: number) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [image, setImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (item.imageUrl) {
+      resolveProductImage(item.imageUrl).then((url) => {
+        if (active) setImage(url);
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [item.imageUrl]);
+
+  return (
+    <li className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5">
+      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+        {/* Imagem do Produto */}
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted relative">
+          {image ? (
+            <img
+              src={image}
+              alt={item.name}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground font-medium">
+              {item.name.slice(0, 10)}
+            </div>
+          )}
+        </div>
+
+        {/* Informações: Nome, Preço Unitário e Cidade */}
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-sm sm:text-base truncate text-foreground">
+            {item.name}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {formatBRL(item.price)} cada
+          </p>
+          {item.cityId && (
+            <span className="inline-block rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary mt-1">
+              {item.cityId === "sao-paulo" ? "São Paulo" : "Cuiabá"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+        {/* Controle de quantidade */}
+        <div className="flex items-center rounded-lg border bg-background">
+          <button
+            type="button"
+            onClick={() => onSetQty(item.id, item.qty - 1)}
+            aria-label="Diminuir quantidade"
+            className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            <Minus className="h-3.5 w-3.5" />
+          </button>
+          <span className="w-8 text-center text-xs font-semibold">
+            {item.qty}
+          </span>
+          <button
+            type="button"
+            onClick={() => onSetQty(item.id, item.qty + 1)}
+            aria-label="Aumentar quantidade"
+            className="p-1.5 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Subtotal do Produto */}
+        <span className="w-24 text-right text-sm font-bold text-foreground">
+          {formatBRL(item.price * item.qty)}
+        </span>
+
+        {/* Remover Produto */}
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          aria-label={`Remover ${item.name}`}
+          className="p-1.5 text-muted-foreground hover:text-destructive cursor-pointer transition-colors"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </li>
   );
 }

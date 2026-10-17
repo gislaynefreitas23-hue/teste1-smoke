@@ -87,6 +87,7 @@ export function ProductCard({ product }: { product: Product }) {
                 price: Number(product.price),
                 cityId: targetCity,
                 stock,
+                imageUrl: product.image_url,
               })
             }
           >

@@ -19,11 +19,19 @@ export type CartItem = {
   qty: number;
   cityId?: "cuiaba" | "sao-paulo";
   stock?: number;
+  imageUrl?: string;
 };
 
 export type CartContextValue = {
   items: CartItem[];
-  add: (item: { id: string; name: string; price: number; cityId?: "cuiaba" | "sao-paulo"; stock?: number }) => boolean;
+  add: (item: {
+    id: string;
+    name: string;
+    price: number;
+    cityId?: "cuiaba" | "sao-paulo";
+    stock?: number;
+    imageUrl?: string;
+  }) => boolean;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -39,7 +47,10 @@ export type CartContextValue = {
 
 export const CartContext = createContext<CartContextValue | null>(null);
 
+const CART_EVENT_NAME = "pantanal_cart_updated";
+
 function readStoredCart(): CartItem[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(CART_KEY);
     if (!raw) return [];
@@ -61,9 +72,20 @@ function readStoredCart(): CartItem[] {
         qty: Number(i.qty),
         cityId: i.cityId === "sao-paulo" || i.cityId === "cuiaba" ? i.cityId : undefined,
         stock: Number.isFinite(Number(i.stock)) ? Number(i.stock) : undefined,
+        imageUrl: typeof i.imageUrl === "string" ? i.imageUrl : undefined,
       }));
   } catch {
     return [];
+  }
+}
+
+function writeStoredCart(items: CartItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(CART_KEY, JSON.stringify(items));
+    window.dispatchEvent(new Event(CART_EVENT_NAME));
+  } catch (e) {
+    console.error("Erro ao persistir carrinho:", e);
   }
 }
 
@@ -122,8 +144,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
     itemsRef.current = items;
   }, [items]);
 
+  // Persiste no localStorage sempre que os itens mudarem após a carga inicial
+  useEffect(() => {
+    if (!loaded) return;
+    writeStoredCart(items);
+  }, [items, loaded]);
+
+  // Sincroniza abas e componentes em tempo real quando o localStorage mudar
+  useEffect(() => {
+    function handleStorage(e: StorageEvent) {
+      if (e.key === CART_KEY) {
+        const stored = readStoredCart();
+        itemsRef.current = stored;
+        setItems(stored);
+      }
+    }
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
   const add = useCallback(
-    (item: { id: string; name: string; price: number; cityId?: "cuiaba" | "sao-paulo"; stock?: number }): boolean => {
+    (item: {
+      id: string;
+      name: string;
+      price: number;
+      cityId?: "cuiaba" | "sao-paulo";
+      stock?: number;
+      imageUrl?: string;
+    }): boolean => {
       const current = itemsRef.current;
 
       // 1. Verifica se já existem produtos de outra cidade no carrinho
@@ -145,9 +195,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           triggerNotification(`${item.name} (limite de estoque atingido)`);
           return true;
         }
-        const updated = current.map((i) => (i.id === item.id ? { ...i, qty: i.qty + 1 } : i));
+        const updated = current.map((i) =>
+          i.id === item.id
+            ? { ...i, qty: i.qty + 1, imageUrl: item.imageUrl || i.imageUrl }
+            : i
+        );
         itemsRef.current = updated;
         setItems(updated);
+        writeStoredCart(updated);
         triggerNotification(item.name);
         return true;
       }
@@ -166,10 +221,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
           qty: 1,
           cityId: item.cityId,
           stock: item.stock,
+          imageUrl: item.imageUrl,
         },
       ];
       itemsRef.current = updated;
       setItems(updated);
+      writeStoredCart(updated);
       triggerNotification(item.name);
       return true;
     },
@@ -177,24 +234,35 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const setQty = useCallback((id: string, qty: number) => {
-    setItems((current) =>
-      qty <= 0
-        ? current.filter((i) => i.id !== id)
-        : current.map((i) => {
-            if (i.id !== id) return i;
-            const max = typeof i.stock === "number" ? i.stock : 9999;
-            return { ...i, qty: Math.min(qty, max) };
-          }),
-    );
+    setItems((current) => {
+      const updated =
+        qty <= 0
+          ? current.filter((i) => i.id !== id)
+          : current.map((i) => {
+              if (i.id !== id) return i;
+              const max = typeof i.stock === "number" ? i.stock : 9999;
+              return { ...i, qty: Math.min(qty, max) };
+            });
+      itemsRef.current = updated;
+      writeStoredCart(updated);
+      return updated;
+    });
   }, []);
 
   const remove = useCallback((id: string) => {
-    setItems((current) => current.filter((i) => i.id !== id));
+    setItems((current) => {
+      const updated = current.filter((i) => i.id !== id);
+      itemsRef.current = updated;
+      writeStoredCart(updated);
+      return updated;
+    });
   }, []);
 
   const clear = useCallback(() => {
+    itemsRef.current = [];
     setItems([]);
     setCityConflictWarning(null);
+    writeStoredCart([]);
   }, []);
 
   const cartCityId = useMemo(() => {
