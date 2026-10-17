@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   UploadCloud,
   Image as ImageIcon,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { resolveProductImage } from "@/lib/brasa";
 
 interface ImageUploadFieldProps {
   value: string;
@@ -37,7 +38,35 @@ export function ImageUploadField({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [successStatus, setSuccessStatus] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>(value);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincroniza e resolve a URL da imagem para exibição (mesmo se privada no Supabase)
+  useEffect(() => {
+    let active = true;
+    if (!value) {
+      setPreviewUrl("");
+      return;
+    }
+
+    // Se já for data URL base64 ou blob
+    if (value.startsWith("data:") || value.startsWith("blob:")) {
+      setPreviewUrl(value);
+      return;
+    }
+
+    resolveProductImage(value).then((resolved) => {
+      if (active && resolved) {
+        setPreviewUrl(resolved);
+      } else if (active) {
+        setPreviewUrl(value);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [value]);
 
   const processFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -48,6 +77,15 @@ export function ImageUploadField({
     setUploadError(null);
     setSuccessStatus(null);
     setIsUploading(true);
+
+    // Mostra prévia instantânea local via FileReader
+    const localReader = new FileReader();
+    localReader.onload = () => {
+      if (typeof localReader.result === "string") {
+        setPreviewUrl(localReader.result);
+      }
+    };
+    localReader.readAsDataURL(file);
 
     try {
       // 1. Gera nome de arquivo padronizado e seguro
@@ -66,12 +104,21 @@ export function ImageUploadField({
           });
 
         if (!storageErr && uploadData?.path) {
-          const { data: publicData } = supabase.storage
+          // Tenta criar URL assinada (funciona mesmo em buckets privados de alta segurança)
+          const { data: signedData, error: signErr } = await supabase.storage
             .from(bucket)
-            .getPublicUrl(uploadData.path);
+            .createSignedUrl(uploadData.path, 60 * 60 * 24 * 365 * 5); // 5 anos
 
-          if (publicData?.publicUrl) {
-            uploadedUrl = publicData.publicUrl;
+          if (!signErr && signedData?.signedUrl) {
+            uploadedUrl = signedData.signedUrl;
+          } else {
+            const { data: publicData } = supabase.storage
+              .from(bucket)
+              .getPublicUrl(uploadData.path);
+
+            if (publicData?.publicUrl) {
+              uploadedUrl = publicData.publicUrl;
+            }
           }
         } else if (storageErr) {
           console.warn("Aviso no Supabase Storage:", storageErr.message);
@@ -80,12 +127,12 @@ export function ImageUploadField({
         console.warn("Supabase Storage indisponível ou offline:", storageException);
       }
 
-      // 3. Se obteve URL pública do Supabase, define-a
+      // 3. Se obteve URL do Supabase, define-a
       if (uploadedUrl) {
         onChange(uploadedUrl);
         setSuccessStatus("Imagem enviada com sucesso do computador!");
       } else {
-        // Fallback robusto: converte para Data URL Base64 para garantir funcionamento mesmo sem bucket ativo
+        // Fallback robusto: converte para Data URL Base64 para garantir funcionamento mesmo se o storage estiver offline
         const reader = new FileReader();
         reader.onload = () => {
           if (typeof reader.result === "string") {
@@ -163,11 +210,10 @@ export function ImageUploadField({
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-lg border border-primary/20 bg-slate-950 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
               <img
-                src={value}
+                src={previewUrl || value}
                 alt="Prévia do produto"
                 className="h-full w-full object-contain"
                 onError={(e) => {
-                  // Fallback se imagem quebrar
                   (e.target as HTMLImageElement).src =
                     "https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=200&auto=format&fit=crop&q=80";
                 }}
@@ -216,7 +262,10 @@ export function ImageUploadField({
               variant="ghost"
               size="sm"
               disabled={isUploading}
-              onClick={() => onChange("")}
+              onClick={() => {
+                onChange("");
+                setPreviewUrl("");
+              }}
               className="text-xs h-8 text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer"
               title="Remover imagem"
             >

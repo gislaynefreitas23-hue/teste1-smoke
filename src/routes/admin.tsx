@@ -40,7 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { supabase } from "@/integrations/supabase/client";
-import { formatBRL } from "@/lib/brasa";
+import { formatBRL, resolveProductImage } from "@/lib/brasa";
 import {
   ADMIN_CONFIG,
   BannerSlide,
@@ -1498,14 +1498,26 @@ function ProductsManagement() {
 
     let productId = draft.id;
     if (productId) {
-      await supabase.from("products").update(payload).eq("id", productId);
+      const { error: updateErr } = await supabase.from("products").update(payload).eq("id", productId);
+      if (updateErr) {
+        console.error("Erro ao atualizar produto:", updateErr);
+        alert(`Erro ao salvar produto: ${updateErr.message}`);
+        setBusy(false);
+        return;
+      }
     } else {
       const { data: newProd, error: insertErr } = await supabase
         .from("products")
         .insert(payload)
         .select("id")
         .single();
-      if (!insertErr && newProd) {
+      if (insertErr) {
+        console.error("Erro ao cadastrar produto:", insertErr);
+        alert(`Erro ao cadastrar produto: ${insertErr.message}`);
+        setBusy(false);
+        return;
+      }
+      if (newProd) {
         productId = newProd.id;
       }
     }
@@ -1867,11 +1879,7 @@ function ProductsManagement() {
                   <div className="flex gap-3">
                     {p.image_url ? (
                       <div className="h-14 w-14 rounded-xl border border-slate-800 bg-slate-950 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                        <img
-                          src={p.image_url}
-                          alt={p.name}
-                          className="h-full w-full object-contain"
-                        />
+                        <AdminProductThumbnail url={p.image_url} alt={p.name} />
                       </div>
                     ) : null}
                     <div className="min-w-0 flex-1">
@@ -2120,5 +2128,30 @@ function OrdersManagement() {
         </div>
       )}
     </div>
+  );
+}
+
+function AdminProductThumbnail({ url, alt }: { url: string; alt: string }) {
+  const [resolved, setResolved] = useState<string | null>(url);
+
+  useEffect(() => {
+    let active = true;
+    resolveProductImage(url).then((resolvedUrl) => {
+      if (active && resolvedUrl) setResolved(resolvedUrl);
+    });
+    return () => {
+      active = false;
+    };
+  }, [url]);
+
+  return (
+    <img
+      src={resolved || url}
+      alt={alt}
+      className="h-full w-full object-contain"
+      onError={(e) => {
+        (e.target as HTMLImageElement).style.display = "none";
+      }}
+    />
   );
 }

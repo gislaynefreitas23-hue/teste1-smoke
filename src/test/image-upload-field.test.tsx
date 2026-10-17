@@ -7,6 +7,7 @@ describe("ImageUploadField: Upload Direto de Imagens do Computador", () => {
   let mockFileApi: {
     upload: any;
     getPublicUrl: any;
+    createSignedUrl: any;
   };
 
   beforeEach(() => {
@@ -14,6 +15,7 @@ describe("ImageUploadField: Upload Direto de Imagens do Computador", () => {
     mockFileApi = {
       upload: vi.fn(),
       getPublicUrl: vi.fn(),
+      createSignedUrl: vi.fn(),
     };
     vi.spyOn(supabase.storage, "from").mockReturnValue(mockFileApi as any);
   });
@@ -43,10 +45,11 @@ describe("ImageUploadField: Upload Direto de Imagens do Computador", () => {
       data: { path: "produto-12345.webp" },
       error: null,
     });
-    mockFileApi.getPublicUrl.mockReturnValue({
+    mockFileApi.createSignedUrl.mockResolvedValue({
       data: {
-        publicUrl: "https://mock-supabase.co/storage/v1/object/public/products/produto-12345.webp",
+        signedUrl: "https://mock-supabase.co/storage/v1/object/sign/products/produto-12345.webp?token=test",
       },
+      error: null,
     });
 
     const handleChange = vi.fn();
@@ -68,9 +71,12 @@ describe("ImageUploadField: Upload Direto de Imagens do Computador", () => {
     await waitFor(() => {
       expect(supabase.storage.from).toHaveBeenCalledWith("products");
       expect(mockFileApi.upload).toHaveBeenCalled();
-      expect(mockFileApi.getPublicUrl).toHaveBeenCalledWith("produto-12345.webp");
+      expect(mockFileApi.createSignedUrl).toHaveBeenCalledWith(
+        "produto-12345.webp",
+        expect.any(Number)
+      );
       expect(handleChange).toHaveBeenCalledWith(
-        "https://mock-supabase.co/storage/v1/object/public/products/produto-12345.webp"
+        "https://mock-supabase.co/storage/v1/object/sign/products/produto-12345.webp?token=test"
       );
     });
   });

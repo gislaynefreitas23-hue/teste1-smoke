@@ -177,12 +177,31 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
  */
 export async function resolveProductImage(imageUrl: string): Promise<string | null> {
   if (!imageUrl) return null;
+  if (imageUrl.startsWith("data:")) return imageUrl;
+
+  // Se for uma URL do Supabase Storage no bucket products ou caminho relativo
+  const supabaseStorageMatch = imageUrl.match(
+    /\/storage\/v1\/object\/(?:public|sign|authenticated)\/products\/([^?]+)/
+  );
+  const storagePath = supabaseStorageMatch
+    ? decodeURIComponent(supabaseStorageMatch[1])
+    : (!imageUrl.startsWith("http") ? imageUrl : null);
+
+  if (storagePath) {
+    try {
+      const { data, error } = await supabase.storage
+        .from("products")
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365 * 5); // 5 anos
+
+      if (!error && data?.signedUrl) {
+        return data.signedUrl;
+      }
+    } catch {
+      // continua para fallback
+    }
+  }
+
   if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
 
-  const { data, error } = await supabase.storage
-    .from("products")
-    .createSignedUrl(imageUrl, 60 * 60 * 24 * 7);
-
-  if (error) return null;
-  return data?.signedUrl ?? null;
+  return null;
 }
