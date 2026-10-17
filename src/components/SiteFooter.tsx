@@ -15,7 +15,7 @@ export function SiteFooter() {
         <div>
           <p className="font-display text-lg font-semibold text-ember">{SITE_NAME}</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Essências, narguilés e acessórios selecionados, presentes em Cuiabá e São Paulo.
+            De Cuiabá a São Paulo, conectando vibes.
           </p>
           <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 text-primary" />
