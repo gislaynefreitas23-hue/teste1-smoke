@@ -68,17 +68,17 @@ export function SiteFooter() {
         </div>
 
         <div className="text-sm">
-          <p className="font-semibold">Pedidos</p>
+          <p className="font-semibold">Atendimento</p>
           <p className="mt-2 text-muted-foreground">
-            Todo pedido é confirmado pelo WhatsApp{" "}
+            Dúvidas ou pedidos? Fale com a gente pelo{" "}
             <a
               href={`https://wa.me/${WHATSAPP_NUMBER}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => openWhatsAppExternal(`https://wa.me/${WHATSAPP_NUMBER}`, e)}
-              className="text-primary hover:underline"
+              className="text-primary hover:underline font-medium"
             >
-              +55 65 99921-0066
+              WhatsApp (+55 65 99921-0066)
             </a>
             .
           </p>
