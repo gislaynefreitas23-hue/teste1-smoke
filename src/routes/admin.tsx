@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUploadField } from "@/components/ImageUploadField";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL } from "@/lib/brasa";
 import {
@@ -1311,12 +1312,12 @@ function BannersManagement({
             </div>
 
             <div>
-              <Label className="text-xs">URL da Foto do Pod</Label>
-              <Input
+              <ImageUploadField
+                label="Foto do Pod no Banner"
                 value={editingSlide.imageUrl}
-                onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
-                placeholder="https://... ou caminho da imagem"
-                className="mt-1 text-sm"
+                onChange={(url) => setEditingSlide({ ...editingSlide, imageUrl: url })}
+                folderPrefix="banner"
+                helperText="Escolha a imagem do produto salva no computador (PNG transparente, JPG, WEBP)."
               />
             </div>
           </div>
@@ -1669,19 +1670,19 @@ function ProductsManagement() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-3">
             <div>
-              <Label className="text-xs font-semibold">URL da Imagem</Label>
-              <Input
+              <ImageUploadField
+                label="Foto / Imagem do Produto"
                 value={draft.image_url}
-                onChange={(e) => setDraft({ ...draft, image_url: e.target.value })}
-                placeholder="https://... ou caminho do arquivo"
-                className="mt-1 text-sm"
+                onChange={(url) => setDraft({ ...draft, image_url: url })}
+                folderPrefix="produto"
+                helperText="Selecione a foto do produto salva no computador (PNG, JPG, WEBP, GIF)."
               />
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Descrição</Label>
+              <Label className="text-xs font-semibold">Descrição do Produto</Label>
               <Input
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
@@ -1863,17 +1864,30 @@ function ProductsManagement() {
             return (
               <div key={p.id} className="rounded-2xl border border-slate-800 bg-card/60 p-4 flex flex-col justify-between hover:border-primary/50 transition-colors">
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                      {p.active ? "Ativo no Site" : "Pausado"}
-                    </span>
-                  </div>
+                  <div className="flex gap-3">
+                    {p.image_url ? (
+                      <div className="h-14 w-14 rounded-xl border border-slate-800 bg-slate-950 p-1 shrink-0 flex items-center justify-center overflow-hidden">
+                        <img
+                          src={p.image_url}
+                          alt={p.name}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+                          {p.active ? "Ativo no Site" : "Pausado"}
+                        </span>
+                      </div>
 
-                  <h4 className="mt-1 font-bold text-white text-sm">{p.name}</h4>
-                  {p.flavor_profile && (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Sabor: {p.flavor_profile}</p>
-                  )}
+                      <h4 className="mt-1 font-bold text-white text-sm truncate">{p.name}</h4>
+                      {p.flavor_profile && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">Sabor: {p.flavor_profile}</p>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Detalhes de Preço e Estoque por Cidade */}
                   <div className="mt-3 space-y-1.5 border-t border-slate-800/80 pt-2.5 text-xs">
