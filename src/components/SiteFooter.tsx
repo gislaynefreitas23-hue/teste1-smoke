@@ -13,7 +13,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-20 border-t bg-card/40">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <p className="font-display text-lg font-semibold text-ember">{SITE_NAME}</p>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -64,6 +64,22 @@ export function SiteFooter() {
             <li>
               <Link to="/admin" className="text-primary hover:underline font-semibold">
                 Painel da Loja
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div className="text-sm">
+          <p className="font-semibold">Institucional</p>
+          <ul className="mt-2 space-y-1 text-muted-foreground">
+            <li>
+              <Link to="/sobre-nos" className="hover:text-foreground">
+                Sobre Nós
+              </Link>
+            </li>
+            <li>
+              <Link to="/perguntas-frequentes" className="hover:text-foreground">
+                Perguntas Frequentes
               </Link>
             </li>
           </ul>
