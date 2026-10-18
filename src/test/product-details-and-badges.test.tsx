@@ -8,11 +8,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DEFAULT_STORE_SETTINGS, getStoreSettings, saveStoreSettings } from "@/lib/store-settings";
 import type { Product } from "@/lib/brasa";
 
+const mockNavigate = vi.fn();
+
 // Mock router
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, to, ...props }: any) => <a href={to} {...props}>{children}</a>,
-  useRouter: () => ({ navigate: vi.fn() }),
-  useNavigate: () => vi.fn(),
+  useRouter: () => ({ navigate: mockNavigate }),
+  useNavigate: () => mockNavigate,
 }));
 
 import { CityProvider } from "@/lib/city";
@@ -62,29 +64,25 @@ const mockPromoProduct: Product = {
 describe("Modal de Detalhes do Produto & Destaques de Catálogo", () => {
   beforeEach(() => {
     localStorage.clear();
+    mockNavigate.mockClear();
   });
 
-  it("1. Permite abrir o modal ao clicar no card do produto e exibe foto ampliada e descrição completa", async () => {
+  it("1. Permite navegar para a página exclusiva de detalhes ao clicar no card do produto", async () => {
     renderWithProviders(<ProductCard product={mockProduct} cityId="cuiaba" />);
 
     // Verifica que o card exibe o produto
     const nameElements = screen.getAllByText("Pod Descartável Ignite V80");
     expect(nameElements.length).toBeGreaterThan(0);
 
-    // Clica no card para abrir o modal de detalhes
+    // Clica no card para abrir a página de detalhes
     const article = screen.getByRole("button", { name: /Ver detalhes do produto/i });
     fireEvent.click(article);
 
-    // O modal abre e exibe a descrição completa e título
-    await waitFor(() => {
-      const descElements = screen.getAllByText(/Dispositivo descartável com 8000 puffs/i);
-      expect(descElements.length).toBeGreaterThan(0);
-      expect(screen.getByRole("dialog")).toBeDefined();
+    // Navega para a página exclusiva do produto
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/produtos/$productId",
+      params: { productId: "prod-ignite-v80" },
     });
-
-    // Verifica botão de adicionar ao carrinho dentro do modal
-    expect(screen.getByText(/Adicionar ao Carrinho/i)).toBeDefined();
-    expect(screen.getAllByText(/Watermelon Ice/i).length).toBeGreaterThan(0);
   });
 
   it("2. Exibe selo de 'LANÇAMENTO' no card e no modal quando ativado", async () => {

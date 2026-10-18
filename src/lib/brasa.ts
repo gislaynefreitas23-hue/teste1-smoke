@@ -239,3 +239,105 @@ export async function resolveProductImage(imageUrl: string): Promise<string | nu
 
   return null;
 }
+
+/**
+ * Consulta de produto individual: busca dados detalhados diretamente do Supabase,
+ * sincronizando inventários por cidade, estoque, preços e destaques.
+ */
+export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" | "sao-paulo" | null) {
+  const targetCity = cityId || "cuiaba";
+
+  return queryOptions({
+    queryKey: ["product", productId, targetCity],
+    queryFn: async (): Promise<Product | null> => {
+      if (!productId) return null;
+
+      let p: any = null;
+
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            id,
+            name,
+            category,
+            description,
+            flavor_profile,
+            intensity,
+            price,
+            image_url,
+            active,
+            product_city_inventories (
+              id,
+              city_id,
+              price,
+              stock,
+              active
+            )
+          `)
+          .eq("id", productId)
+          .maybeSingle();
+
+        if (!error && data) {
+          p = data;
+        } else if (error) {
+          throw error;
+        }
+      } catch {
+        const { data, error } = await supabase
+          .from("products")
+          .select("id,name,category,description,flavor_profile,intensity,price,image_url,active")
+          .eq("id", productId)
+          .maybeSingle();
+
+        if (error) throw error;
+        p = data;
+      }
+
+      if (!p) return null;
+
+      const inventoriesList: CityInventory[] = Array.isArray(p.product_city_inventories)
+        ? p.product_city_inventories
+        : [];
+
+      const invMap: Record<string, CityInventory> = {};
+      for (const inv of inventoriesList) {
+        invMap[inv.city_id] = {
+          ...inv,
+          price: Number(inv.price),
+          stock: Number(inv.stock),
+        };
+      }
+
+      const cityInv = invMap[targetCity];
+      const stock = cityInv ? Number(cityInv.stock) : 15;
+      const price = cityInv ? Number(cityInv.price) : Number(p.price);
+      const isCityActive = cityInv ? cityInv.active !== false : true;
+
+      const settings = getStoreSettings();
+      const productBadges = settings.productBadges || {};
+      const productPromoPrices = settings.productPromoPrices || {};
+
+      const badge = productBadges[p.id] || "nenhum";
+      const promoPrice = productPromoPrices[p.id];
+
+      return {
+        id: p.id,
+        name: p.name,
+        category: p.category,
+        description: p.description,
+        flavor_profile: p.flavor_profile,
+        intensity: p.intensity,
+        price,
+        stock,
+        image_url: p.image_url,
+        city_id: targetCity,
+        inventories: invMap,
+        badge,
+        promo_price: promoPrice && promoPrice > 0 ? promoPrice : undefined,
+        active: p.active && isCityActive,
+      };
+    },
+  });
+}
+

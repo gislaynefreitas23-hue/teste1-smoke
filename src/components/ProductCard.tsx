@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Check, Eye, Package, Plus, Sparkles, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,13 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { formatBRL, resolveProductImage, type Product } from "@/lib/brasa";
 import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
-import { ProductDetailModal } from "@/components/ProductDetailModal";
 
 export function ProductCard({ product }: { product: Product }) {
+  const navigate = useNavigate();
   const { add } = useCart();
   const { selectedCityId } = useCity();
   const [image, setImage] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
 
   const targetCity = product.city_id || selectedCityId || "cuiaba";
   const stock = typeof product.stock === "number" ? product.stock : 15;
@@ -31,17 +31,24 @@ export function ProductCard({ product }: { product: Product }) {
     };
   }, [product.image_url]);
 
+  const handleOpenProduct = () => {
+    navigate({
+      to: "/produtos/$productId",
+      params: { productId: product.id },
+    });
+  };
+
   return (
     <>
       <article
-        onClick={() => setDetailOpen(true)}
+        onClick={handleOpenProduct}
         className="group flex flex-col overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:border-primary/60 hover:shadow-glow cursor-pointer"
         tabIndex={0}
         role="button"
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setDetailOpen(true);
+            handleOpenProduct();
           }
         }}
         aria-label={`Ver detalhes do produto ${product.name}`}
@@ -153,13 +160,6 @@ export function ProductCard({ product }: { product: Product }) {
           </div>
         </div>
       </article>
-
-      {/* Modal de Detalhes Completo ao Clicar no Produto */}
-      <ProductDetailModal
-        product={product}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-      />
     </>
   );
 }

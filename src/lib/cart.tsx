@@ -24,14 +24,17 @@ export type CartItem = {
 
 export type CartContextValue = {
   items: CartItem[];
-  add: (item: {
-    id: string;
-    name: string;
-    price: number;
-    cityId?: "cuiaba" | "sao-paulo";
-    stock?: number;
-    imageUrl?: string;
-  }) => boolean;
+  add: (
+    item: {
+      id: string;
+      name: string;
+      price: number;
+      cityId?: "cuiaba" | "sao-paulo";
+      stock?: number;
+      imageUrl?: string;
+    },
+    quantity?: number,
+  ) => boolean;
   setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
@@ -166,14 +169,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const add = useCallback(
-    (item: {
-      id: string;
-      name: string;
-      price: number;
-      cityId?: "cuiaba" | "sao-paulo";
-      stock?: number;
-      imageUrl?: string;
-    }): boolean => {
+    (
+      item: {
+        id: string;
+        name: string;
+        price: number;
+        cityId?: "cuiaba" | "sao-paulo";
+        stock?: number;
+        imageUrl?: string;
+      },
+      quantity: number = 1,
+    ): boolean => {
+      const addedQty = Math.max(1, Math.floor(quantity || 1));
       const current = itemsRef.current;
 
       // 1. Verifica se já existem produtos de outra cidade no carrinho
@@ -190,14 +197,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const existing = current.find((i) => i.id === item.id);
       const maxStock = typeof item.stock === "number" ? item.stock : 9999;
 
+      if (maxStock <= 0) {
+        triggerNotification(`${item.name} (esgotado)`);
+        return false;
+      }
+
       if (existing) {
         if (existing.qty >= maxStock) {
           triggerNotification(`${item.name} (limite de estoque atingido)`);
           return true;
         }
+        const newQty = Math.min(existing.qty + addedQty, maxStock);
         const updated = current.map((i) =>
           i.id === item.id
-            ? { ...i, qty: i.qty + 1, imageUrl: item.imageUrl || i.imageUrl }
+            ? { ...i, qty: newQty, imageUrl: item.imageUrl || i.imageUrl }
             : i
         );
         itemsRef.current = updated;
@@ -207,18 +220,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      if (maxStock <= 0) {
-        triggerNotification(`${item.name} (esgotado)`);
-        return false;
-      }
-
+      const initialQty = Math.min(addedQty, maxStock);
       const updated = [
         ...current,
         {
           id: item.id,
           name: item.name,
           price: item.price,
-          qty: 1,
+          qty: initialQty,
           cityId: item.cityId,
           stock: item.stock,
           imageUrl: item.imageUrl,
