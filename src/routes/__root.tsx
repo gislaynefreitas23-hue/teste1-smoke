@@ -20,6 +20,12 @@ import { SiteHeader } from "../components/SiteHeader";
 import { CartProvider } from "../lib/cart";
 import { CityProvider } from "../lib/city";
 import { SITE_NAME } from "../lib/brasa";
+import { supabase } from "../integrations/supabase/client";
+import {
+  saveStoreSettingsLocally,
+  fetchRemoteStoreSettings,
+  SYSTEM_SETTINGS_CATEGORY,
+} from "../lib/store-settings";
 
 function NotFoundComponent() {
   return (
@@ -177,6 +183,49 @@ function RootComponent() {
       return () => observer.disconnect();
     }
   }, []);
+
+  // Sincronização em tempo real via Supabase Realtime para produtos, pedidos e personalizações
+  useEffect(() => {
+    // Carrega configurações da nuvem logo na inicialização
+    fetchRemoteStoreSettings().catch(() => {});
+
+    const channel = supabase
+      .channel("pantanal-realtime-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        (payload: any) => {
+          const newRecord = payload.new;
+          if (newRecord && newRecord.category === SYSTEM_SETTINGS_CATEGORY) {
+            try {
+              if (newRecord.description) {
+                const parsed = JSON.parse(newRecord.description);
+                saveStoreSettingsLocally(parsed);
+              }
+            } catch {
+              // ignore
+            }
+          }
+          // Invalida e atualiza consultas em tempo real
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+          queryClient.invalidateQueries({ queryKey: ["product"] });
+          queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
 
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");

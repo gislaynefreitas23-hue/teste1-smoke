@@ -49,6 +49,13 @@ export interface StoreSettings {
   productBadges: Record<string, "nenhum" | "lancamento" | "promocao">;
   productPromoPrices: Record<string, number>;
   productOrder: string[];
+  cityInventories?: Record<
+    string,
+    {
+      cuiaba?: { price: number; stock: number; active: boolean };
+      "sao-paulo"?: { price: number; stock: number; active: boolean };
+    }
+  >;
 }
 
 export interface FAQSettingItem {
@@ -183,58 +190,148 @@ export function getStoreSettings(): StoreSettings {
   }
 }
 
-/**
- * Salva as novas configurações da loja e dispara sincronização
- */
-export async function saveStoreSettings(settings: StoreSettings): Promise<void> {
-  if (typeof window === "undefined") return;
+export const SYSTEM_SETTINGS_CATEGORY = "_system_settings";
 
+/**
+ * Salva as configurações em cache local e emite evento para atualização imediata na tela
+ */
+export function saveStoreSettingsLocally(settings: StoreSettings) {
+  if (typeof window === "undefined") return;
   try {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     window.dispatchEvent(new CustomEvent(SETTINGS_EVENT_NAME, { detail: settings }));
-
-    // Tenta persistir no Supabase se houver tabela configurada
-    try {
-      await supabase.from("store_settings" as any).upsert({
-        key: "general",
-        value: settings,
-        updated_at: new Date().toISOString(),
-      });
-    } catch {
-      // Falha silenciosa no banco se a tabela não estiver criada
-    }
   } catch (err) {
-    console.error("Erro ao salvar configurações:", err);
+    console.error("Erro ao salvar configurações localmente:", err);
   }
 }
 
 /**
- * Hook React reativo para usar as configurações da loja em qualquer página
+ * Busca as configurações da loja salvas na nuvem (Supabase)
+ */
+export async function fetchRemoteStoreSettings(): Promise<StoreSettings | null> {
+  // 1. Tenta a tabela dedicada store_settings caso tenha sido criada
+  try {
+    const { data, error } = await (supabase as any)
+      .from("store_settings")
+      .select("value")
+      .eq("key", "general")
+      .maybeSingle();
+
+    if (!error && data && (data as any).value) {
+      const merged: StoreSettings = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
+      saveStoreSettingsLocally(merged);
+      return merged;
+    }
+  } catch {
+    // continua para o fallback
+  }
+
+  // 2. Fallback de alta disponibilidade: registro de sistema na tabela products
+  try {
+    const query = supabase.from("products").select("description");
+    if (typeof (query as any)?.eq === "function") {
+      const { data, error } = await (query as any)
+        .eq("category", SYSTEM_SETTINGS_CATEGORY)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (!error && data?.description) {
+        const parsed = JSON.parse(data.description);
+        const merged: StoreSettings = {
+          ...DEFAULT_STORE_SETTINGS,
+          ...parsed,
+          banners:
+            Array.isArray(parsed.banners) && parsed.banners.length > 0
+              ? parsed.banners
+              : DEFAULT_STORE_SETTINGS.banners,
+          productBadges: parsed.productBadges || {},
+          productPromoPrices: parsed.productPromoPrices || {},
+          productOrder: Array.isArray(parsed.productOrder) ? parsed.productOrder : [],
+        };
+        saveStoreSettingsLocally(merged);
+        return merged;
+      }
+    }
+  } catch {
+    // Fallback silencioso
+  }
+
+  return null;
+}
+
+/**
+ * Salva as novas configurações da loja na nuvem e no dispositivo local,
+ * disparando a sincronização em tempo real para todos os clientes.
+ */
+export async function saveStoreSettings(settings: StoreSettings): Promise<void> {
+  saveStoreSettingsLocally(settings);
+
+  // 1. Tenta persistir na tabela store_settings se existir
+  try {
+    const table = (supabase as any).from("store_settings");
+    if (typeof table?.upsert === "function") {
+      const { error: dedicatedError } = await table.upsert({
+        key: "general",
+        value: settings,
+        updated_at: new Date().toISOString(),
+      });
+      if (!dedicatedError) return;
+    }
+  } catch {
+    // continua para fallback
+  }
+
+  // 2. Persiste com segurança na tabela products na linha reservada de sistema
+  try {
+    const selectQuery = supabase.from("products").select("id");
+    let existingRow: { id: string } | null = null;
+
+    if (typeof (selectQuery as any)?.eq === "function") {
+      const { data } = await (selectQuery as any)
+        .eq("category", SYSTEM_SETTINGS_CATEGORY)
+        .maybeSingle();
+      existingRow = data;
+    }
+
+    const payload = {
+      name: "Configurações Globais Pantanal Smoke",
+      category: SYSTEM_SETTINGS_CATEGORY,
+      description: JSON.stringify(settings),
+      price: 0,
+      active: true,
+      image_url: "",
+      flavor_profile: "system",
+      intensity: "system",
+    };
+
+    if (existingRow?.id) {
+      await supabase.from("products").update(payload).eq("id", existingRow.id);
+    } else {
+      await supabase.from("products").insert(payload);
+    }
+  } catch {
+    // Fallback silencioso caso ambiente offline ou mock restrito
+  }
+}
+
+/**
+ * Hook React reativo para usar as configurações da loja em qualquer página com sincronização contínua
  */
 export function useStoreSettings() {
   const [settings, setSettings] = useState<StoreSettings>(getStoreSettings());
 
   useEffect(() => {
-    // Sincroniza do banco no carregamento
-    async function fetchRemote() {
-      try {
-        const { data } = await supabase
-          .from("store_settings" as any)
-          .select("value")
-          .eq("key", "general")
-          .maybeSingle();
+    // Busca remota inicial
+    fetchRemoteStoreSettings().then((remote) => {
+      if (remote) setSettings(remote);
+    });
 
-        if (data && (data as any).value) {
-          const merged = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
-          localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(merged));
-          setSettings(merged);
-        }
-      } catch {
-        // Usa local se remoto não responder
-      }
-    }
-
-    fetchRemote();
+    // Polling a cada 4 segundos como garantia de atualização contínua em tempo real
+    const interval = setInterval(() => {
+      fetchRemoteStoreSettings().then((remote) => {
+        if (remote) setSettings(remote);
+      });
+    }, 4000);
 
     function handleUpdate(e: Event) {
       if ((e as CustomEvent).detail) {
@@ -248,6 +345,7 @@ export function useStoreSettings() {
     window.addEventListener("storage", handleUpdate);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener(SETTINGS_EVENT_NAME, handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };

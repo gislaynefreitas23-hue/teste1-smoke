@@ -826,7 +826,7 @@ function AdminDashboardSection({
   }, [orders]);
 
   const activeProducts = useMemo(() => {
-    return products.filter((p) => p.active !== false);
+    return products.filter((p) => p.active !== false && p.category !== "_system_settings");
   }, [products]);
 
   const lowStockProducts = useMemo(() => {
@@ -1394,7 +1394,8 @@ function ProductsManagementSection() {
   });
 
   const orderList = settings.productOrder || [];
-  const sortedRawProducts = [...rawProducts].sort((a: any, b: any) => {
+  const validRawProducts = rawProducts.filter((p: any) => p.category !== "_system_settings");
+  const sortedRawProducts = [...validRawProducts].sort((a: any, b: any) => {
     const idxA = orderList.indexOf(a.id);
     const idxB = orderList.indexOf(b.id);
     if (idxA !== -1 && idxB !== -1) return idxA - idxB;
@@ -1454,8 +1455,13 @@ function ProductsManagementSection() {
 
   function openEditProduct(p: any) {
     const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
-    const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
-    const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
+    const citySettings = settings.cityInventories?.[p.id];
+    const cuiabaInv =
+      inventories.find((i: any) => i.city_id === "cuiaba") ||
+      (citySettings?.cuiaba ? { city_id: "cuiaba", ...citySettings.cuiaba } : null);
+    const spInv =
+      inventories.find((i: any) => i.city_id === "sao-paulo") ||
+      (citySettings?.["sao-paulo"] ? { city_id: "sao-paulo", ...citySettings["sao-paulo"] } : null);
 
     let availability: "both" | "cuiaba" | "sao-paulo" = "both";
     if (cuiabaInv && spInv) {
@@ -1585,8 +1591,23 @@ function ProductsManagementSection() {
       updatedOrder.push(productId);
     }
 
+    const updatedCityInventories = { ...(settings.cityInventories || {}) };
+    updatedCityInventories[productId] = {
+      cuiaba: {
+        price: cuiabaPrice,
+        stock: Number(draft.cuiaba_stock) || 0,
+        active: cuiabaActive,
+      },
+      "sao-paulo": {
+        price: saoPauloPrice,
+        stock: Number(draft.sao_paulo_stock) || 0,
+        active: spActive,
+      },
+    };
+
     await saveSettings({
       ...settings,
+      cityInventories: updatedCityInventories,
       productBadges: updatedBadges,
       productPromoPrices: updatedPromoPrices,
       productOrder: updatedOrder,
@@ -1615,10 +1636,14 @@ function ProductsManagementSection() {
     const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
     delete updatedPromoPrices[productId];
 
+    const updatedCityInventories = { ...(settings.cityInventories || {}) };
+    delete updatedCityInventories[productId];
+
     const updatedOrder = (settings.productOrder || []).filter((id) => id !== productId);
 
     await saveSettings({
       ...settings,
+      cityInventories: updatedCityInventories,
       productBadges: updatedBadges,
       productPromoPrices: updatedPromoPrices,
       productOrder: updatedOrder,

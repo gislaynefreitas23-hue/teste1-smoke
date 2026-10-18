@@ -1,7 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
-import { getStoreSettings } from "@/lib/store-settings";
+import { getStoreSettings, SYSTEM_SETTINGS_CATEGORY } from "@/lib/store-settings";
 
 export const SITE_NAME = "Pantanal Smoke";
 
@@ -67,6 +67,8 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
 
   return queryOptions({
     queryKey: ["products", targetCity],
+    refetchInterval: 4000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<Product[]> => {
       // 1. Tenta carregar os produtos junto com seus inventários específicos de cidade
       let rawProducts: any[] = [];
@@ -97,7 +99,7 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
           .order("name", { ascending: true });
 
         if (!error && data) {
-          rawProducts = data;
+          rawProducts = (data ?? []).filter((p: any) => p.category !== SYSTEM_SETTINGS_CATEGORY);
         } else {
           throw error;
         }
@@ -111,9 +113,10 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
           .order("name", { ascending: true });
 
         if (error) throw error;
-        rawProducts = data ?? [];
+        rawProducts = (data ?? []).filter((p: any) => p.category !== SYSTEM_SETTINGS_CATEGORY);
       }
 
+      const settings = getStoreSettings();
       const filteredList: Product[] = [];
 
       for (const p of rawProducts) {
@@ -152,7 +155,20 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
             inventories: invMap,
           });
         } else {
-          // Fallback seguro: se ainda não houver inventário por cidade, atribui 15 unidades padrão
+          // Fallback dinâmico: verifica se o administrador definiu estoque/preço por cidade nas configurações
+          const cityOverride = settings.cityInventories?.[p.id]?.[targetCity];
+          if (cityOverride && cityOverride.active === false) {
+            continue;
+          }
+
+          const cityPrice =
+            cityOverride?.price !== undefined ? Number(cityOverride.price) : Number(p.price);
+          const cityStock =
+            cityOverride?.stock !== undefined ? Number(cityOverride.stock) : 15;
+
+          const cuiabaOverride = settings.cityInventories?.[p.id]?.cuiaba;
+          const spOverride = settings.cityInventories?.[p.id]?.["sao-paulo"];
+
           filteredList.push({
             id: p.id,
             name: p.name,
@@ -160,20 +176,29 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
             description: p.description,
             flavor_profile: p.flavor_profile,
             intensity: p.intensity,
-            price: Number(p.price),
-            stock: 15,
+            price: cityPrice,
+            stock: cityStock,
             image_url: p.image_url,
             city_id: targetCity,
             inventories: {
-              cuiaba: { city_id: "cuiaba", price: Number(p.price), stock: 15, active: true },
-              "sao-paulo": { city_id: "sao-paulo", price: Number(p.price), stock: 15, active: true },
+              cuiaba: {
+                city_id: "cuiaba",
+                price: cuiabaOverride?.price !== undefined ? Number(cuiabaOverride.price) : Number(p.price),
+                stock: cuiabaOverride?.stock !== undefined ? Number(cuiabaOverride.stock) : 15,
+                active: cuiabaOverride?.active !== undefined ? cuiabaOverride.active : true,
+              },
+              "sao-paulo": {
+                city_id: "sao-paulo",
+                price: spOverride?.price !== undefined ? Number(spOverride.price) : Number(p.price),
+                stock: spOverride?.stock !== undefined ? Number(spOverride.stock) : 15,
+                active: spOverride?.active !== undefined ? spOverride.active : true,
+              },
             },
           });
         }
       }
 
       // Aplica destaques (Lançamento / Promoção) e ordenação personalizada configurados no painel
-      const settings = getStoreSettings();
       const productBadges = settings.productBadges || {};
       const productPromoPrices = settings.productPromoPrices || {};
       const productOrder = Array.isArray(settings.productOrder) ? settings.productOrder : [];
@@ -249,6 +274,8 @@ export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" |
 
   return queryOptions({
     queryKey: ["product", productId, targetCity],
+    refetchInterval: 4000,
+    refetchOnWindowFocus: true,
     queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
 
@@ -309,12 +336,24 @@ export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" |
         };
       }
 
-      const cityInv = invMap[targetCity];
-      const stock = cityInv ? Number(cityInv.stock) : 15;
-      const price = cityInv ? Number(cityInv.price) : Number(p.price);
-      const isCityActive = cityInv ? cityInv.active !== false : true;
-
       const settings = getStoreSettings();
+      const cityOverride = settings.cityInventories?.[p.id]?.[targetCity];
+
+      let stock = 15;
+      let price = Number(p.price);
+      let isCityActive = true;
+
+      if (inventoriesList.length > 0) {
+        const cityInv = invMap[targetCity];
+        stock = cityInv ? Number(cityInv.stock) : 15;
+        price = cityInv ? Number(cityInv.price) : Number(p.price);
+        isCityActive = cityInv ? cityInv.active !== false : true;
+      } else if (cityOverride) {
+        stock = cityOverride.stock !== undefined ? Number(cityOverride.stock) : 15;
+        price = cityOverride.price !== undefined ? Number(cityOverride.price) : Number(p.price);
+        isCityActive = cityOverride.active !== false;
+      }
+
       const productBadges = settings.productBadges || {};
       const productPromoPrices = settings.productPromoPrices || {};
 
