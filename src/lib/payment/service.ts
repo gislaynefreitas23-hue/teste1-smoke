@@ -205,24 +205,58 @@ export async function processCheckout(
     .substring(2, 6)
     .toUpperCase()}`;
 
-  // 5. Se o cliente estiver autenticado, registra o pedido no banco oficial via Supabase
-  if (userId) {
-    try {
-      const dbPayload = summary.verifiedItems.map((i) => ({ id: i.id, qty: i.qty }));
-      const { data, error } = await (supabase.rpc as any)("place_order", {
-        _items: dbPayload,
-        _use_cashback: payload.useCashback,
-        _name: payload.customer.name,
-        _phone: payload.customer.phone,
-        _address: formattedAddress,
-        _city_id: payload.selectedCityId || "cuiaba",
-      });
+  // 5. Registra o pedido no banco de dados do Supabase (tanto para clientes cadastrados quanto visitantes)
+  try {
+    const dbPayload = summary.verifiedItems.map((i) => ({ id: i.id, qty: i.qty }));
+    const { data, error } = await (supabase.rpc as any)("place_order", {
+      _items: dbPayload,
+      _use_cashback: !!userId && payload.useCashback,
+      _name: payload.customer.name,
+      _phone: payload.customer.phone,
+      _address: formattedAddress,
+      _city_id: payload.selectedCityId || "cuiaba",
+    });
 
-      if (!error && data && (data as { id?: string }).id) {
-        orderId = (data as { id: string }).id;
-      }
-    } catch (dbErr) {
-      console.warn("Aviso na persistência via RPC place_order:", dbErr);
+    if (!error && data && (data as { id?: string }).id) {
+      orderId = (data as { id: string }).id;
+    } else {
+      // Fallback seguro: inserção direta caso o RPC falhe ou rejeite visitantes
+      await (supabase.from("orders") as any).insert({
+        id: orderId,
+        user_id: userId || null,
+        customer_name: payload.customer.name,
+        phone: payload.customer.phone,
+        address: formattedAddress,
+        city_id: payload.selectedCityId || "cuiaba",
+        items: summary.verifiedItems,
+        subtotal: summary.subtotal,
+        cashback_used: summary.cashbackUsed,
+        total: summary.total,
+        status: "pendente",
+        payment_method: payload.paymentMethod,
+        payment_status: "aguardando_pagamento",
+      });
+    }
+  } catch (dbErr) {
+    console.warn("Aviso na persistência de pedidos via RPC:", dbErr);
+    try {
+      await (supabase.from("orders") as any).insert({
+        id: orderId,
+        user_id: userId || null,
+        customer_name: payload.customer.name,
+        phone: payload.customer.phone,
+        address: formattedAddress,
+        city_id: payload.selectedCityId || "cuiaba",
+        items: summary.verifiedItems,
+        subtotal: summary.subtotal,
+        cashback_used: summary.cashbackUsed,
+        total: summary.total,
+        status: "pendente",
+        payment_method: payload.paymentMethod,
+        payment_status: "aguardando_pagamento",
+      });
+    } catch (insertErr) {
+      console.warn("Aviso no fallback de pedidos:", insertErr);
     }
   }
 
@@ -246,6 +280,45 @@ export async function processCheckout(
       : undefined,
     deliveryDetails: payload.deliveryDetails,
   });
+
+  // Atualiza métodos e status do pagamento no pedido registrado
+  try {
+    await (supabase.from("orders") as any)
+      .update({
+        payment_method: payload.paymentMethod,
+        payment_status: paymentResult.status,
+      })
+      .eq("id", orderId);
+  } catch {
+    // ignora se offline
+  }
+
+  // Backup seguro no histórico de pedidos para garantir visualização no painel
+  if (typeof window !== "undefined") {
+    try {
+      const existingOrders = JSON.parse(localStorage.getItem("pantanal_saved_orders") || "[]");
+      const orderRecord = {
+        id: orderId,
+        customer_name: payload.customer.name,
+        phone: payload.customer.phone,
+        address: formattedAddress,
+        city_id: payload.selectedCityId || "cuiaba",
+        items: summary.verifiedItems,
+        subtotal: summary.subtotal,
+        delivery_fee: summary.deliveryFee,
+        cashback_used: summary.cashbackUsed,
+        total: summary.total,
+        payment_method: payload.paymentMethod,
+        payment_status: paymentResult.status,
+        status: "pendente",
+        created_at: new Date().toISOString(),
+      };
+      existingOrders.unshift(orderRecord);
+      localStorage.setItem("pantanal_saved_orders", JSON.stringify(existingOrders.slice(0, 100)));
+    } catch {
+      // ignora
+    }
+  }
 
   const response: CheckoutResponse = {
     success: true,

@@ -1,37 +1,48 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
-  ArrowUpRight,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Coins,
   Edit2,
   Eye,
   FileText,
+  Filter,
   HelpCircle,
   ImagePlus,
   Layers,
+  LayoutDashboard,
   Lock,
   LogOut,
   Mail,
   MapPin,
+  Menu,
   MessageCircle,
+  PackageCheck,
+  Palette,
+  Phone,
   Plus,
   RefreshCw,
   Save,
+  Search,
   Settings,
   ShieldCheck,
   ShoppingBag,
   Sliders,
   Sparkles,
   Trash2,
+  TrendingUp,
   Truck,
   User,
+  Users,
+  Wallet,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -39,7 +50,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadField } from "@/components/ImageUploadField";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,7 +74,7 @@ export const Route = createFileRoute("/admin")({
       { title: "Painel Administrativo Master — Pantanal Smoke" },
       {
         name: "description",
-        content: "Controle total e gerenciamento das informações, produtos e pedidos da Pantanal Smoke.",
+        content: "Sistema exclusivo de gestão e administração da Pantanal Smoke.",
       },
     ],
   }),
@@ -72,12 +82,20 @@ export const Route = createFileRoute("/admin")({
 });
 
 type AuthViewMode = "loading" | "login" | "forgot_password" | "reset_password" | "dashboard";
+type AdminSection =
+  | "dashboard"
+  | "pedidos"
+  | "produtos"
+  | "cidades"
+  | "personalizar"
+  | "clientes"
+  | "configuracoes";
 
 function AdminPage() {
   const [authMode, setAuthMode] = useState<AuthViewMode>("loading");
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
 
-  // Estados dos formulários
+  // Formulários de autenticação
   const [emailInput, setEmailInput] = useState(ADMIN_CONFIG.email || "");
   const [passwordInput, setPasswordInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
@@ -92,7 +110,6 @@ function AdminPage() {
 
     async function checkCurrentSession() {
       try {
-        // 1. Detecta se a URL contém hash ou parâmetros de recuperação do Supabase Auth
         const isRecoveryUrl =
           typeof window !== "undefined" &&
           (window.location.hash.includes("type=recovery") ||
@@ -100,508 +117,207 @@ function AdminPage() {
             window.location.href.includes("type=recovery"));
 
         if (isRecoveryUrl) {
-          if (isMounted) {
-            setAuthMode("reset_password");
-            setSuccessMessage("Link de recuperação autenticado. Digite sua nova senha abaixo.");
-          }
+          if (isMounted) setAuthMode("reset_password");
           return;
         }
 
-        // 2. Se houver código PKCE de autorização/recuperação do Supabase na query string
-        if (typeof window !== "undefined" && window.location.search.includes("code=")) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const authCode = urlParams.get("code");
-          if (authCode) {
-            const { data: exchangeData, error: exchangeError } =
-              await supabase.auth.exchangeCodeForSession(authCode);
-
-            if (!exchangeError && exchangeData?.session?.user) {
-              // Limpa a query string para deixar a URL limpa
-              window.history.replaceState(null, "", window.location.pathname);
-
-              const isUserAdmin = await verifyUserIsAdmin(exchangeData.session.user.id);
-              if (isUserAdmin) {
-                if (isMounted) {
-                  setCurrentUserEmail(exchangeData.session.user.email || "");
-                  setAuthMode("dashboard");
-                }
-                return;
-              } else {
-                await supabase.auth.signOut();
-                if (isMounted) {
-                  setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
-                  setAuthMode("login");
-                }
-                return;
-              }
-            }
-          }
-        }
-
-        // 3. Validação da sessão ativa persistida (permanência segura após atualizar a página)
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData?.session?.user;
 
-        if (user) {
-          const isAdmin = await verifyUserIsAdmin(user.id);
-          if (isAdmin) {
-            if (isMounted) {
-              setCurrentUserEmail(user.email || "");
-              setAuthMode("dashboard");
-            }
-            return;
-          } else {
-            // Usuário comum logado tentando acessar /admin: desconecta imediatamente
-            await supabase.auth.signOut();
-            if (isMounted) {
-              setCurrentUserEmail("");
-              setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
-              setAuthMode("login");
-            }
-            return;
+        if (!user) {
+          if (isMounted) setAuthMode("login");
+          return;
+        }
+
+        const isAdmin = await verifyUserIsAdmin(user.id);
+        if (isAdmin && isMounted) {
+          setCurrentUserEmail(user.email || ADMIN_CONFIG.email);
+          setAuthMode("dashboard");
+        } else {
+          if (isMounted) {
+            setAuthMode("login");
+            setErrorMessage("Acesso restrito: este usuário não possui papel de administrador.");
           }
         }
       } catch (err) {
-        console.error("Erro ao verificar sessão administrativa:", err);
-      }
-
-      if (isMounted) {
-        setAuthMode("login");
+        console.error("Erro na verificação administrativa:", err);
+        if (isMounted) setAuthMode("login");
       }
     }
 
     checkCurrentSession();
 
-    // Ouve eventos do Supabase Auth (como recuperação de senha, login ou logout)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
-
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setAuthMode("reset_password");
-        setSuccessMessage("Link de recuperação validado. Defina sua nova senha abaixo.");
-        return;
-      }
-
-      if (event === "SIGNED_OUT") {
-        setAuthMode("login");
-        setCurrentUserEmail("");
-        return;
-      }
-
-      if (event === "SIGNED_IN" && session?.user) {
+      } else if (event === "SIGNED_IN" && session?.user) {
         const isAdmin = await verifyUserIsAdmin(session.user.id);
         if (isAdmin) {
-          setCurrentUserEmail(session.user.email || "");
+          setCurrentUserEmail(session.user.email || ADMIN_CONFIG.email);
           setAuthMode("dashboard");
         } else {
-          await supabase.auth.signOut();
-          setCurrentUserEmail("");
           setAuthMode("login");
           setErrorMessage("Acesso negado: Este usuário não possui privilégios de administrador.");
         }
+      } else if (event === "SIGNED_OUT") {
+        setAuthMode("login");
+        setCurrentUserEmail("");
       }
     });
 
+    const handleCustomAuthChange = () => {
+      checkCurrentSession();
+    };
+    window.addEventListener("pantanal_admin_auth_changed", handleCustomAuthChange);
+
     return () => {
       isMounted = false;
-      subscription?.unsubscribe();
+      authListener.subscription.unsubscribe();
+      window.removeEventListener("pantanal_admin_auth_changed", handleCustomAuthChange);
     };
   }, []);
 
-  // --- Submissão de Login ---
-  async function handleLoginSubmit(e: React.FormEvent) {
+  async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
+    setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-    setIsSubmitting(true);
 
-    try {
-      const result = await loginAdminWithSupabase(emailInput, passwordInput);
-      if (result.success) {
-        setCurrentUserEmail(emailInput.trim());
-        setAuthMode("dashboard");
-      } else {
-        setErrorMessage(
-          result.error ||
-            "Credenciais administrativas inválidas ou sem permissão de administrador."
-        );
-      }
-    } catch {
-      setErrorMessage("Erro inesperado ao realizar login administrativo.");
-    } finally {
-      setIsSubmitting(false);
+    const result = await loginAdminWithSupabase(emailInput, passwordInput);
+
+    if (result.success) {
+      setCurrentUserEmail(emailInput.trim().toLowerCase());
+      setPasswordInput("");
+      setAuthMode("dashboard");
+    } else {
+      setErrorMessage(result.error || "Falha no login administrativo.");
     }
+    setIsSubmitting(false);
   }
 
-  // --- Solicitação de Recuperação de Senha ---
-  async function handleForgotPasswordSubmit(e: React.FormEvent) {
+  async function handleRequestReset(e: React.FormEvent) {
     e.preventDefault();
+    setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-    setIsSubmitting(true);
 
-    try {
-      const result = await requestAdminPasswordReset(emailInput);
-      if (result.success) {
-        setSuccessMessage(
-          "Se o e-mail informado estiver cadastrado, você receberá um link seguro para redefinir sua senha. Verifique também a pasta de spam."
-        );
-      } else {
-        setErrorMessage(result.error || "Não foi possível solicitar a recuperação de senha.");
-      }
-    } catch {
-      setErrorMessage("Erro ao conectar com o serviço de recuperação.");
-    } finally {
-      setIsSubmitting(false);
+    const result = await requestAdminPasswordReset(emailInput);
+    if (result.success) {
+      setSuccessMessage("Link de redefinição enviado com sucesso! Verifique sua caixa de entrada.");
+    } else {
+      setErrorMessage(result.error || "Erro ao solicitar redefinição de senha.");
     }
+    setIsSubmitting(false);
   }
 
-  // --- Redefinição de Nova Senha ---
-  async function handleResetPasswordSubmit(e: React.FormEvent) {
+  async function handleUpdatePassword(e: React.FormEvent) {
     e.preventDefault();
+    setIsSubmitting(true);
     setErrorMessage(null);
     setSuccessMessage(null);
-
-    if (newPasswordInput.length < 6) {
-      setErrorMessage("A nova senha deve ter no mínimo 6 caracteres.");
-      return;
-    }
 
     if (newPasswordInput !== confirmPasswordInput) {
-      setErrorMessage("As senhas digitadas não coincidem. Verifique e tente novamente.");
+      setErrorMessage("As senhas informadas não coincidem.");
+      setIsSubmitting(false);
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      const result = await updateAdminPassword(newPasswordInput);
-      if (result.success) {
-        setSuccessMessage("Senha alterada com sucesso! Você já pode entrar com a nova senha.");
-        setNewPasswordInput("");
-        setConfirmPasswordInput("");
-        // Limpa hash da url e volta para login após breve confirmação
-        if (typeof window !== "undefined" && window.location.hash) {
-          window.history.replaceState(null, "", window.location.pathname);
-        }
-        setTimeout(() => {
-          setAuthMode("login");
-        }, 2000);
-      } else {
-        setErrorMessage(result.error || "Não foi possível atualizar a senha.");
-      }
-    } catch {
-      setErrorMessage("Erro inesperado ao definir nova senha.");
-    } finally {
-      setIsSubmitting(false);
+    const result = await updateAdminPassword(newPasswordInput);
+    if (result.success) {
+      setSuccessMessage("Senha administrativa atualizada com sucesso! Acessando painel...");
+      setTimeout(() => {
+        setAuthMode("dashboard");
+      }, 1500);
+    } else {
+      setErrorMessage(result.error || "Erro ao atualizar senha.");
     }
+    setIsSubmitting(false);
   }
 
-  // --- Logout ---
   async function handleLogout() {
     await logoutAdmin();
     setAuthMode("login");
-    setCurrentUserEmail("");
     setPasswordInput("");
-    setErrorMessage(null);
-    setSuccessMessage(null);
   }
 
-  // Estado de Carregamento
+  // --- Telas de Autenticação / Loading ---
   if (authMode === "loading") {
     return (
-      <main className="mx-auto flex min-h-[60vh] items-center justify-center text-muted-foreground">
-        <RefreshCw className="h-6 w-6 animate-spin text-primary mr-2" />
-        Verificando permissões administrativas...
-      </main>
-    );
-  }
-
-  // --- TELA DE RECUPERAÇÃO DE SENHA (ESQUECI MINHA SENHA) ---
-  if (authMode === "forgot_password") {
-    return (
-      <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
-        <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary border border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.35)]">
-              <Mail className="h-7 w-7" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Recuperar Senha</h1>
-            <p className="text-xs text-muted-foreground">
-              Informe seu e-mail administrativo para receber um link seguro de recuperação via Supabase Auth.
-            </p>
-          </div>
-
-          <form onSubmit={handleForgotPasswordSubmit} className="mt-8 space-y-4">
-            <div>
-              <Label htmlFor="admin-reset-email" className="text-xs font-semibold">
-                E-mail Cadastrado
-              </Label>
-              <div className="relative mt-1">
-                <Input
-                  id="admin-reset-email"
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="seu-email@dominio.com"
-                  className="pr-9 text-sm"
-                />
-                <Mail className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-
-            {errorMessage && (
-              <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
-                <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-400" />
-                <span>{successMessage}</span>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              size="lg"
-              disabled={isSubmitting}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Enviando link...
-                </>
-              ) : (
-                "Enviar link de recuperação"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("login");
-                setErrorMessage(null);
-                setSuccessMessage(null);
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              ← Voltar para o login
-            </button>
-          </div>
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm font-medium text-slate-300">Validando permissões administrativas...</p>
         </div>
       </main>
     );
   }
 
-  // --- TELA DE DEFINIÇÃO DE NOVA SENHA (PÓS LINK DE RECUPERAÇÃO) ---
-  if (authMode === "reset_password") {
+  if (authMode === "login") {
     return (
-      <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
-        <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_20px_rgba(16,185,129,0.35)]">
-              <Lock className="h-7 w-7" />
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/20 border border-primary/40 text-primary">
+              <ShieldCheck className="h-6 w-6" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Definir Nova Senha</h1>
-            <p className="text-xs text-muted-foreground">
-              Digite uma nova senha segura para acessar o Painel Master da Pantanal Smoke.
-            </p>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white">Painel de Gestão</h1>
+            <p className="text-xs text-slate-400 mt-1">Ambiente exclusivo da administração Pantanal Smoke</p>
           </div>
 
-          <form onSubmit={handleResetPasswordSubmit} className="mt-8 space-y-4">
-            <div>
-              <Label htmlFor="admin-new-pass" className="text-xs font-semibold">
-                Nova Senha (mínimo 6 caracteres)
-              </Label>
-              <div className="relative mt-1">
-                <Input
-                  id="admin-new-pass"
-                  type="password"
-                  required
-                  value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder="Digite sua nova senha"
-                  className="pr-9 text-sm"
-                />
-                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              </div>
+          {errorMessage && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-300">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+              <span>{errorMessage}</span>
             </div>
+          )}
 
+          <form onSubmit={handleAdminLogin} className="mt-6 space-y-4">
             <div>
-              <Label htmlFor="admin-confirm-pass" className="text-xs font-semibold">
-                Confirmar Nova Senha
-              </Label>
-              <div className="relative mt-1">
-                <Input
-                  id="admin-confirm-pass"
-                  type="password"
-                  required
-                  value={confirmPasswordInput}
-                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                  placeholder="Confirme sua nova senha"
-                  className="pr-9 text-sm"
-                />
-                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              </div>
-            </div>
-
-            {errorMessage && (
-              <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                <span>{successMessage}</span>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              size="lg"
-              disabled={isSubmitting}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Atualizando senha...
-                </>
-              ) : (
-                "Salvar Nova Senha"
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("login");
-                setErrorMessage(null);
-                setSuccessMessage(null);
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-            >
-              ← Voltar para o login
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // --- TELA DE LOGIN ADMINISTRATIVO ---
-  if (authMode !== "dashboard") {
-    return (
-      <main className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center px-4 py-12">
-        <div className="rounded-3xl border border-primary/30 bg-card/80 p-8 backdrop-blur-xl shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20 text-primary border border-primary/40 shadow-[0_0_20px_rgba(168,85,247,0.35)]">
-              <Lock className="h-7 w-7" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Painel da Loja</h1>
-            <p className="text-xs text-muted-foreground">
-              Acesso exclusivo para administradores autenticados via Supabase Auth
-            </p>
-          </div>
-
-          <form onSubmit={handleLoginSubmit} className="mt-8 space-y-4">
-            <div>
-              <Label htmlFor="admin-email" className="text-xs font-semibold">
-                E-mail do Administrador
-              </Label>
-              <div className="relative mt-1">
-                <Input
-                  id="admin-email"
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="gislaynefreitas23@gmail.com"
-                  className="pr-9 text-sm"
-                />
-                <Mail className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              </div>
+              <Label className="text-xs font-semibold text-slate-300">E-mail do Administrador</Label>
+              <Input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="admin@pantanalsmoke.com.br"
+                className="mt-1.5 bg-slate-950/60 border-slate-800 text-white"
+                required
+              />
             </div>
 
             <div>
               <div className="flex items-center justify-between">
-                <Label htmlFor="admin-pass" className="text-xs font-semibold">
-                  Senha de Acesso
-                </Label>
+                <Label className="text-xs font-semibold text-slate-300">Senha Master</Label>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAuthMode("forgot_password");
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                  }}
-                  className="text-xs text-primary hover:underline font-medium"
+                  onClick={() => setAuthMode("forgot_password")}
+                  className="text-xs text-primary hover:underline"
                 >
                   Esqueci minha senha
                 </button>
               </div>
-              <div className="relative mt-1">
-                <Input
-                  id="admin-pass"
-                  type="password"
-                  required
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Digite sua senha"
-                  className="pr-9 text-sm"
-                />
-                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              </div>
+              <Input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="••••••••••••"
+                className="mt-1.5 bg-slate-950/60 border-slate-800 text-white"
+                required
+              />
             </div>
-
-            {errorMessage && (
-              <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{errorMessage}</span>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                <span>{successMessage}</span>
-              </div>
-            )}
 
             <Button
               type="submit"
-              size="lg"
               disabled={isSubmitting}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow mt-2"
             >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                  Autenticando...
-                </>
-              ) : (
-                "Acessar Painel Master"
-              )}
+              {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Lock className="h-4 w-4 mr-2" />}
+              Entrar no Sistema de Gestão
             </Button>
           </form>
 
-          <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-            <Link to="/" className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1">
-              ← Voltar para a loja
+          <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
+            <Link to="/" className="text-xs text-slate-400 hover:text-white inline-flex items-center gap-1 transition-colors">
+              ← Acessar a loja pública como cliente
             </Link>
           </div>
         </div>
@@ -609,795 +325,1038 @@ function AdminPage() {
     );
   }
 
-  // --- Painel Master Autenticado com Papel Admin Confirmado ---
-  return <MasterAdminDashboard onLogout={handleLogout} userEmail={currentUserEmail} />;
+  if (authMode === "forgot_password") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
+              <Mail className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white">Recuperação de Senha</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Informe seu e-mail cadastrado para receber o link de redefinição
+            </p>
+          </div>
+
+          {errorMessage && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-300">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleRequestReset} className="mt-6 space-y-4">
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">E-mail Administrativo</Label>
+              <Input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="admin@pantanalsmoke.com.br"
+                className="mt-1.5 bg-slate-950/60 border-slate-800 text-white"
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow"
+            >
+              {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+              Enviar Link de Redefinição
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setAuthMode("login")}
+              className="text-xs text-primary hover:underline"
+            >
+              ← Voltar para o Login
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  if (authMode === "reset_password") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-4">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
+          <div className="text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400">
+              <Lock className="h-6 w-6" />
+            </div>
+            <h1 className="mt-4 text-2xl font-bold tracking-tight text-white">Criar Nova Senha Master</h1>
+            <p className="text-xs text-slate-400 mt-1">Defina sua nova credencial de segurança</p>
+          </div>
+
+          {errorMessage && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-300">
+              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+              <span>{successMessage}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleUpdatePassword} className="mt-6 space-y-4">
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Nova Senha</Label>
+              <Input
+                type="password"
+                value={newPasswordInput}
+                onChange={(e) => setNewPasswordInput(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className="mt-1.5 bg-slate-950/60 border-slate-800 text-white"
+                required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Confirmar Nova Senha</Label>
+              <Input
+                type="password"
+                value={confirmPasswordInput}
+                onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                placeholder="Repita a senha"
+                className="mt-1.5 bg-slate-950/60 border-slate-800 text-white"
+                required
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-glow"
+            >
+              {isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar Nova Senha
+            </Button>
+          </form>
+
+          <div className="mt-6 border-t border-slate-800/80 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setAuthMode("login")}
+              className="text-xs text-slate-400 hover:text-white"
+            >
+              Cancelar e ir para Login
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // --- Painel Master Autenticado (Layout Dedicado & Profissional) ---
+  return <MasterAdminApp onLogout={handleLogout} userEmail={currentUserEmail} />;
 }
 
-function MasterAdminDashboard({
+// ==========================================
+// APLICAÇÃO ADMINISTRATIVA MASTER
+// ==========================================
+function MasterAdminApp({
   onLogout,
   userEmail,
 }: {
   onLogout: () => void;
   userEmail: string;
 }) {
+  const [activeSection, setActiveSection] = useState<AdminSection>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const queryClient = useQueryClient();
   const { settings, saveSettings } = useStoreSettings();
-  const [formData, setFormData] = useState<StoreSettings>(settings);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Sincroniza estado inicial do formulário quando as configurações mudarem
-  useEffect(() => {
-    setFormData(settings);
-  }, [settings]);
+  // Consulta de pedidos reais no Supabase com reconciliação segura
+  const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: async () => {
+      let dbOrders: any[] = [];
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(100);
+        if (!error && data) dbOrders = data;
+      } catch (err) {
+        console.warn("Aviso ao carregar pedidos do Supabase:", err);
+      }
 
-  const faqsList = formData.faqs && formData.faqs.length > 0 ? formData.faqs : DEFAULT_STORE_SETTINGS.faqs;
+      let cachedOrders: any[] = [];
+      if (typeof window !== "undefined") {
+        try {
+          cachedOrders = JSON.parse(localStorage.getItem("pantanal_saved_orders") || "[]");
+        } catch {
+          // ignore
+        }
+      }
 
-  function handleFaqChange(index: number, field: "question" | "answer", value: string) {
-    const updated = [...faqsList];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData({ ...formData, faqs: updated });
-  }
+      const dbIds = new Set(dbOrders.map((o) => o.id));
+      const pendingLocal = cachedOrders.filter((co) => !dbIds.has(co.id));
 
-  function handleAddFaq() {
-    const newFaq: FAQSettingItem = {
-      id: `faq-${Date.now()}`,
-      question: "",
-      answer: "",
-    };
-    setFormData({ ...formData, faqs: [...faqsList, newFaq] });
-  }
+      return [...pendingLocal, ...dbOrders];
+    },
+    refetchInterval: 15000,
+  });
 
-  function handleRemoveFaq(index: number) {
-    const updated = faqsList.filter((_, i) => i !== index);
-    setFormData({ ...formData, faqs: updated });
-  }
+  // Consulta de produtos cadastrados no Supabase com inventários
+  const { data: rawProducts = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["admin-products"],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            *,
+            product_city_inventories (
+              id,
+              city_id,
+              price,
+              stock,
+              active
+            )
+          `)
+          .order("category")
+          .order("name");
+        if (!error && data) return data;
+        throw error;
+      } catch {
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("category")
+          .order("name");
+        if (error) throw error;
+        return data ?? [];
+      }
+    },
+  });
 
-  async function handleSaveGeneralSettings(e: React.FormEvent) {
-    e.preventDefault();
-    setIsSaving(true);
-    setSaveSuccess(false);
-
-    await saveSettings(formData);
-
-    setIsSaving(false);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 4000);
-  }
+  // Itens de navegação
+  const navItems = [
+    {
+      id: "dashboard" as AdminSection,
+      label: "Dashboard",
+      icon: LayoutDashboard,
+      badge: null,
+    },
+    {
+      id: "pedidos" as AdminSection,
+      label: "Pedidos & Entregas",
+      icon: Truck,
+      badge: orders.filter((o: any) => o.status === "pendente" || o.status === "aguardando_pagamento").length || null,
+    },
+    {
+      id: "produtos" as AdminSection,
+      label: "Catálogo de Produtos",
+      icon: ShoppingBag,
+      badge: null,
+    },
+    {
+      id: "cidades" as AdminSection,
+      label: "Cidades & Entregas",
+      icon: MapPin,
+      badge: null,
+    },
+    {
+      id: "personalizar" as AdminSection,
+      label: "Personalizar Site",
+      icon: Palette,
+      badge: null,
+    },
+    {
+      id: "clientes" as AdminSection,
+      label: "Clientes & Cashback",
+      icon: Coins,
+      badge: null,
+    },
+    {
+      id: "configuracoes" as AdminSection,
+      label: "Configurações Gerais",
+      icon: Settings,
+      badge: null,
+    },
+  ];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      {/* Topo do Painel */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 pb-6">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            <span>Controle Master Ativo</span>
+    <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans antialiased">
+      {/* SIDEBAR DESKTOP */}
+      <aside className="hidden lg:flex w-72 flex-col border-r border-slate-800 bg-slate-900/70 p-5 backdrop-blur-xl">
+        {/* Topo Sidebar */}
+        <div className="flex items-center gap-3 px-2 py-3 border-b border-slate-800">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-purple-800 text-white shadow-glow">
+            <Zap className="h-5 w-5 fill-current" />
           </div>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
-            Painel Administrativo da Pantanal Smoke
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            Conectado como <strong className="text-foreground">{userEmail || ADMIN_CONFIG.email}</strong>
-          </p>
+          <div>
+            <h2 className="text-sm font-extrabold tracking-tight text-white uppercase">Pantanal Smoke</h2>
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Sistema de Gestão
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button variant="outline" size="sm" asChild className="border-slate-700 hover:bg-slate-800 text-xs">
-            <Link to="/" target="_blank">
-              <Eye className="h-3.5 w-3.5 mr-1 text-primary" />
-              Ver Site
-            </Link>
-          </Button>
-
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onLogout}
-            className="text-xs gap-1.5"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Sair
-          </Button>
-        </div>
-      </div>
-
-      {/* Abas do Painel */}
-      <Tabs defaultValue="config" className="mt-6">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 bg-slate-900 border border-slate-800 p-1 rounded-2xl h-auto">
-          <TabsTrigger value="config" className="py-2.5 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-xl">
-            <Settings className="h-4 w-4 mr-1.5" />
-            Configurações da Loja
-          </TabsTrigger>
-          <TabsTrigger value="banners" className="py-2.5 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-xl">
-            <Layers className="h-4 w-4 mr-1.5" />
-            Banners & Carrossel
-          </TabsTrigger>
-          <TabsTrigger value="produtos" className="py-2.5 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-xl">
-            <ShoppingBag className="h-4 w-4 mr-1.5" />
-            Catálogo de Produtos
-          </TabsTrigger>
-          <TabsTrigger value="pedidos" className="py-2.5 text-xs font-semibold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-xl">
-            <Truck className="h-4 w-4 mr-1.5" />
-            Pedidos & Entregas
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ABA 1: CONFIGURAÇÕES DA LOJA */}
-        <TabsContent value="config" className="mt-6 space-y-6">
-          <form onSubmit={handleSaveGeneralSettings} className="space-y-6">
-            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Sliders className="h-5 w-5 text-primary" />
-                  Informações Gerais do Site
-                </h2>
-
-                <Button type="submit" disabled={isSaving} className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow">
-                  {isSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  <span>Salvar Alterações</span>
-                </Button>
-              </div>
-
-              {saveSuccess && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-                  <span>Configurações salvas e aplicadas em todo o site com sucesso!</span>
+        {/* Links de Navegação */}
+        <nav className="mt-6 flex-1 space-y-1.5">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveSection(item.id)}
+                className={`w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-primary text-white shadow-glow font-bold"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`h-4 w-4 ${isActive ? "text-white" : "text-slate-400"}`} />
+                  <span>{item.label}</span>
                 </div>
-              )}
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="st-name" className="text-xs font-semibold">Nome da Loja</Label>
-                  <Input
-                    id="st-name"
-                    value={formData.siteName}
-                    onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="st-slogan" className="text-xs font-semibold">Slogan Principal</Label>
-                  <Input
-                    id="st-slogan"
-                    value={formData.slogan}
-                    onChange={(e) => setFormData({ ...formData, slogan: e.target.value })}
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="st-whats" className="text-xs font-semibold flex items-center gap-1.5">
-                    <MessageCircle className="h-4 w-4 text-emerald-400" />
-                    Número do WhatsApp Oficial (com 55 + DDD)
-                  </Label>
-                  <Input
-                    id="st-whats"
-                    value={formData.whatsappNumber}
-                    onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
-                    placeholder="5565999210066"
-                    className="mt-1 text-sm font-mono"
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Link gerado: https://wa.me/{formData.whatsappNumber.replace(/\D/g, "")}
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="st-whats-msg" className="text-xs font-semibold">
-                    Mensagem Padrão ao Iniciar Conversa
-                  </Label>
-                  <Input
-                    id="st-whats-msg"
-                    value={formData.whatsappMessage}
-                    onChange={(e) => setFormData({ ...formData, whatsappMessage: e.target.value })}
-                    placeholder="Olá! Gostaria de fazer um pedido."
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <Label htmlFor="st-fee" className="text-xs font-semibold flex items-center gap-1.5">
-                    <Truck className="h-4 w-4 text-primary" />
-                    Taxa Fixa de Entrega para Cuiabá (R$)
-                  </Label>
-                  <Input
-                    id="st-fee"
-                    type="number"
-                    step="0.50"
-                    value={formData.deliveryFeeCuiaba}
-                    onChange={(e) => setFormData({ ...formData, deliveryFeeCuiaba: Number(e.target.value) || 0 })}
-                    className="mt-1 text-sm font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="st-cashback-rate" className="text-xs font-semibold flex items-center gap-1.5">
-                    <Coins className="h-4 w-4 text-primary" />
-                    Percentual de Cashback (ex: 0.05 para 5%)
-                  </Label>
-                  <Input
-                    id="st-cashback-rate"
-                    type="number"
-                    step="0.01"
-                    value={formData.cashbackRate}
-                    onChange={(e) => setFormData({ ...formData, cashbackRate: Number(e.target.value) || 0 })}
-                    className="mt-1 text-sm"
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Equivalente a {(formData.cashbackRate * 100).toFixed(0)}% de retorno
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor="st-hours" className="text-xs font-semibold flex items-center gap-1.5">
-                    <Clock className="h-4 w-4 text-primary" />
-                    Horário de Atendimento
-                  </Label>
-                  <Input
-                    id="st-hours"
-                    value={formData.openingHours}
-                    onChange={(e) => setFormData({ ...formData, openingHours: e.target.value })}
-                    placeholder="Atendimento das 10h às 19h"
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="st-cb-title" className="text-xs font-semibold">
-                  Título da Seção de Cashback
-                </Label>
-                <Input
-                  id="st-cb-title"
-                  value={formData.cashbackTitle}
-                  onChange={(e) => setFormData({ ...formData, cashbackTitle: e.target.value })}
-                  placeholder="Cashback na sua próxima compra"
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="st-cb-desc" className="text-xs font-semibold">
-                  Texto Explicativo do Cashback
-                </Label>
-                <Textarea
-                  id="st-cb-desc"
-                  rows={2}
-                  value={formData.cashbackDescription}
-                  onChange={(e) => setFormData({ ...formData, cashbackDescription: e.target.value })}
-                  placeholder="Entre na sua conta com seu e-mail e receba 5% do valor do seu pedido em cashback para usar na próxima compra."
-                  className="mt-1 text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Seção: Frases e Textos Institucionais do Site */}
-            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
-              <div className="border-b border-slate-800 pb-3">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  Frases & Textos Institucionais do Site
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Altere os slogans, frases de destaque da página inicial e textos do rodapé sem precisar mexer no código.
-                </p>
-              </div>
-
-              {/* 1. Frase de Destaque da Home */}
-              <div>
-                <Label htmlFor="st-home-highlight" className="text-xs font-semibold">
-                  Frase de Destaque da Página Inicial (Abaixo do Slogan)
-                </Label>
-                <Input
-                  id="st-home-highlight"
-                  value={formData.homeHighlightPhrase || ""}
-                  onChange={(e) => setFormData({ ...formData, homeHighlightPhrase: e.target.value })}
-                  placeholder="Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              {/* 2. Card de Benefício / Estoque Local da Home */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="st-benefit-title" className="text-xs font-semibold">
-                    Título do Card de Estoque/Entrega Local
-                  </Label>
-                  <Input
-                    id="st-benefit-title"
-                    value={formData.benefitCardTitle || ""}
-                    onChange={(e) => setFormData({ ...formData, benefitCardTitle: e.target.value })}
-                    placeholder="100% Online, Estoque Local"
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="st-benefit-desc" className="text-xs font-semibold">
-                    Descrição do Card de Estoque/Entrega Local
-                  </Label>
-                  <Textarea
-                    id="st-benefit-desc"
-                    rows={2}
-                    value={formData.benefitCardDescription || ""}
-                    onChange={(e) => setFormData({ ...formData, benefitCardDescription: e.target.value })}
-                    placeholder="Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia."
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Frases do Rodapé */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="st-footer-tagline" className="text-xs font-semibold">
-                    Frase Institucional do Rodapé
-                  </Label>
-                  <Input
-                    id="st-footer-tagline"
-                    value={formData.footerTagline || ""}
-                    onChange={(e) => setFormData({ ...formData, footerTagline: e.target.value })}
-                    placeholder="De Cuiabá a São Paulo, conectando vibes."
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="st-footer-contact" className="text-xs font-semibold">
-                    Frase de Atendimento no Rodapé (antes do link)
-                  </Label>
-                  <Input
-                    id="st-footer-contact"
-                    value={formData.footerContactText || ""}
-                    onChange={(e) => setFormData({ ...formData, footerContactText: e.target.value })}
-                    placeholder="Dúvidas ou pedidos? Fale com a gente pelo"
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Seção: Página "Sobre Nós" */}
-            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
-              <div className="border-b border-slate-800 pb-3">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  Página Institucional "Sobre Nós" (/sobre-nos)
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Edite a história, os propósitos regionais e a frase final de encerramento da página Sobre Nós.
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="st-about-title" className="text-xs font-semibold">
-                  Título da Página
-                </Label>
-                <Input
-                  id="st-about-title"
-                  value={formData.aboutUsTitle || ""}
-                  onChange={(e) => setFormData({ ...formData, aboutUsTitle: e.target.value })}
-                  placeholder="Sobre Nós"
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="st-about-p1" className="text-xs font-semibold">
-                  Parágrafo 1 — Origem e Fundação dos Empreendedores
-                </Label>
-                <Textarea
-                  id="st-about-p1"
-                  rows={3}
-                  value={formData.aboutUsParagraph1 || ""}
-                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph1: e.target.value })}
-                  placeholder="A Pantanal Smoke nasceu da visão de três empreendedores de Cuiabá que, vivendo em São Paulo..."
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="st-about-p2" className="text-xs font-semibold">
-                  Parágrafo 2 — Propósitos em Cuiabá e São Paulo
-                </Label>
-                <Textarea
-                  id="st-about-p2"
-                  rows={3}
-                  value={formData.aboutUsParagraph2 || ""}
-                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph2: e.target.value })}
-                  placeholder="Em Cuiabá, nosso propósito é oferecer mais variedade, qualidade e preços justos..."
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="st-about-p3" className="text-xs font-semibold">
-                  Parágrafo 3 — Compromisso com Conveniência e Experiência
-                </Label>
-                <Textarea
-                  id="st-about-p3"
-                  rows={2}
-                  value={formData.aboutUsParagraph3 || ""}
-                  onChange={(e) => setFormData({ ...formData, aboutUsParagraph3: e.target.value })}
-                  placeholder="Mais do que vender, queremos proporcionar conveniência, variedade e uma experiência diferenciada a cada cliente."
-                  className="mt-1 text-sm"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="st-about-brand" className="text-xs font-semibold">
-                  Frase de Assinatura da Marca (Destaque Final)
-                </Label>
-                <Input
-                  id="st-about-brand"
-                  value={formData.aboutUsBrandPhrase || ""}
-                  onChange={(e) => setFormData({ ...formData, aboutUsBrandPhrase: e.target.value })}
-                  placeholder="Pantanal Smoke — Conecte a sua vibe."
-                  className="mt-1 text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Seção: Página "Perguntas Frequentes" */}
-            <div className="rounded-2xl border border-slate-800 bg-card/60 p-6 backdrop-blur-sm space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-3">
-                <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <HelpCircle className="h-5 w-5 text-primary" />
-                    Página Institucional "Perguntas Frequentes" (/perguntas-frequentes)
-                  </h2>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Gerencie o título, subtítulo e as perguntas/respostas do acordeão da central de dúvidas.
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={handleAddFaq}
-                  variant="outline"
-                  size="sm"
-                  className="border-primary/40 text-primary hover:bg-primary/10 gap-1.5 text-xs w-full sm:w-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Adicionar Pergunta
-                </Button>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="st-faq-title" className="text-xs font-semibold">
-                    Título da Página
-                  </Label>
-                  <Input
-                    id="st-faq-title"
-                    value={formData.faqTitle || ""}
-                    onChange={(e) => setFormData({ ...formData, faqTitle: e.target.value })}
-                    placeholder="Perguntas Frequentes"
-                    className="mt-1 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="st-faq-subtitle" className="text-xs font-semibold">
-                    Subtítulo / Chamada
-                  </Label>
-                  <Input
-                    id="st-faq-subtitle"
-                    value={formData.faqSubtitle || ""}
-                    onChange={(e) => setFormData({ ...formData, faqSubtitle: e.target.value })}
-                    placeholder="Tire suas dúvidas e compre com mais tranquilidade."
-                    className="mt-1 text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Lista de FAQs editáveis */}
-              <div className="space-y-4 pt-2">
-                <Label className="text-xs font-semibold text-white">
-                  Perguntas e Respostas Cadastradas ({faqsList.length})
-                </Label>
-
-                {faqsList.map((faq, index) => (
-                  <div
-                    key={faq.id || `faq-${index}`}
-                    className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3"
+                {item.badge !== null && item.badge > 0 && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                      isActive ? "bg-white text-primary" : "bg-primary/20 text-primary border border-primary/40"
+                    }`}
                   >
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                      <span className="flex items-center gap-2 text-xs font-bold text-primary">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/20 text-[10px]">
-                          {index + 1}
-                        </span>
-                        Pergunta #{index + 1}
-                      </span>
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveFaq(index)}
-                        className="h-7 px-2 text-xs text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 gap-1"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        Excluir
-                      </Button>
-                    </div>
+        {/* Rodapé da Sidebar */}
+        <div className="border-t border-slate-800 pt-4 space-y-3">
+          <div className="rounded-xl border border-slate-800/80 bg-slate-950/50 p-3 text-xs">
+            <p className="text-[11px] text-slate-400">Administrador Conectado:</p>
+            <p className="truncate font-semibold text-white mt-0.5">{userEmail || ADMIN_CONFIG.email}</p>
+          </div>
 
-                    <div>
-                      <Label className="text-[11px] font-semibold text-slate-300">
-                        Pergunta
-                      </Label>
-                      <Input
-                        value={faq.question}
-                        onChange={(e) => handleFaqChange(index, "question", e.target.value)}
-                        placeholder="Ex: Como funciona a entrega?"
-                        className="mt-1 text-xs"
-                      />
-                    </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="flex-1 border-slate-800 hover:bg-slate-800 text-xs text-slate-300"
+            >
+              <Link to="/" target="_blank">
+                <Eye className="h-3.5 w-3.5 mr-1 text-primary" />
+                Ver Loja
+              </Link>
+            </Button>
 
-                    <div>
-                      <Label className="text-[11px] font-semibold text-slate-300">
-                        Resposta
-                      </Label>
-                      <Textarea
-                        rows={2}
-                        value={faq.answer}
-                        onChange={(e) => handleFaqChange(index, "answer", e.target.value)}
-                        placeholder="Ex: Em Cuiabá, a taxa é fixa de R$ 10..."
-                        className="mt-1 text-xs"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isSaving} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow">
-                {isSaving ? "Salvando..." : "Salvar Todas as Configurações"}
-              </Button>
-            </div>
-          </form>
-        </TabsContent>
-
-        {/* ABA 2: BANNERS & CARROSSEL DE LANÇAMENTO */}
-        <TabsContent value="banners" className="mt-6">
-          <BannersManagement
-            banners={formData.banners}
-            onUpdateBanners={async (updated) => {
-              const newSettings = { ...formData, banners: updated };
-              setFormData(newSettings);
-              await saveSettings(newSettings);
-            }}
-          />
-        </TabsContent>
-
-        {/* ABA 3: CATÁLOGO DE PRODUTOS */}
-        <TabsContent value="produtos" className="mt-6">
-          <ProductsManagement />
-        </TabsContent>
-
-        {/* ABA 4: PEDIDOS & ENTREGAS */}
-        <TabsContent value="pedidos" className="mt-6">
-          <OrdersManagement />
-        </TabsContent>
-      </Tabs>
-    </main>
-  );
-}
-
-// ==========================================
-// COMPONENTE: GERENCIADOR DE BANNERS
-// ==========================================
-function BannersManagement({
-  banners,
-  onUpdateBanners,
-}: {
-  banners: BannerSlide[];
-  onUpdateBanners: (banners: BannerSlide[]) => Promise<void>;
-}) {
-  const [editingSlide, setEditingSlide] = useState<BannerSlide | null>(null);
-
-  async function handleToggleActive(id: string) {
-    const updated = banners.map((b) => (b.id === id ? { ...b, active: !b.active } : b));
-    await onUpdateBanners(updated);
-  }
-
-  async function handleSaveSlide(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingSlide) return;
-
-    const exists = banners.some((b) => b.id === editingSlide.id);
-    let updated: BannerSlide[];
-    if (exists) {
-      updated = banners.map((b) => (b.id === editingSlide.id ? editingSlide : b));
-    } else {
-      updated = [...banners, { ...editingSlide, order: banners.length + 1 }];
-    }
-
-    await onUpdateBanners(updated);
-    setEditingSlide(null);
-  }
-
-  async function handleDeleteSlide(id: string) {
-    if (!window.confirm("Deseja realmente remover este slide do carrossel?")) return;
-    const updated = banners.filter((b) => b.id !== id);
-    await onUpdateBanners(updated);
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-white">Carrossel de Lançamentos</h2>
-          <p className="text-xs text-muted-foreground">
-            Altere os títulos, slogans de rodapé, quantidade de puffs e imagens do carrossel em `/produtos`.
-          </p>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onLogout}
+              className="text-xs"
+              title="Encerrar Sessão"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
+      </aside>
 
-        <Button
-          onClick={() =>
-            setEditingSlide({
-              id: `slide-${Date.now()}`,
-              badge: "LANÇAMENTO",
-              title: "Novo Sabor",
-              puffs: "40.000 PUFFS",
-              footerPhrase: "Qualidade de Sabor e Autonomia Garantida",
-              imageUrl: "",
-              active: true,
-              order: banners.length + 1,
-            })
-          }
-          className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5"
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Slide
-        </Button>
-      </div>
-
-      {/* Modal/Formulário de Edição de Slide */}
-      {editingSlide && (
-        <form onSubmit={handleSaveSlide} className="rounded-2xl border border-primary/40 bg-card/90 p-5 backdrop-blur-md space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-            <h3 className="text-sm font-bold text-white">Editar Slide do Carrossel</h3>
-            <span className="text-xs text-primary font-mono">{editingSlide.id}</span>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <Label className="text-xs">Selo de Destaque (Badge)</Label>
-              <Input
-                value={editingSlide.badge}
-                onChange={(e) => setEditingSlide({ ...editingSlide, badge: e.target.value })}
-                placeholder="LANÇAMENTO"
-                className="mt-1 text-sm"
-                required
-              />
-            </div>
+      {/* ÁREA PRINCIPAL */}
+      <div className="flex flex-1 flex-col min-w-0">
+        {/* CABEÇALHO SUPERIOR (Desktop & Mobile) */}
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800 bg-slate-950/90 px-4 sm:px-6 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden rounded-lg border border-slate-800 p-2 text-slate-300 hover:bg-slate-800"
+              aria-label="Abrir menu"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
 
             <div>
-              <Label className="text-xs">Nome do Sabor / Produto</Label>
-              <Input
-                value={editingSlide.title}
-                onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
-                placeholder="Ex: Aurora Berries"
-                className="mt-1 text-sm"
-                required
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs">Capacidade (Puffs)</Label>
-              <Input
-                value={editingSlide.puffs}
-                onChange={(e) => setEditingSlide({ ...editingSlide, puffs: e.target.value })}
-                placeholder="40.000 PUFFS"
-                className="mt-1 text-sm font-semibold"
-                required
-              />
+              <h1 className="text-sm sm:text-base font-bold text-white capitalize">
+                {navItems.find((n) => n.id === activeSection)?.label}
+              </h1>
+              <p className="hidden sm:block text-[11px] text-slate-400">
+                Painel Administrativo Independente da Pantanal Smoke
+              </p>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">Frase Sincronizada do Rodapé</Label>
-              <Input
-                value={editingSlide.footerPhrase}
-                onChange={(e) => setEditingSlide({ ...editingSlide, footerPhrase: e.target.value })}
-                placeholder="Consistência de Sabor de Alta Performance"
-                className="mt-1 text-sm"
-                required
-              />
-            </div>
-
-            <div>
-              <ImageUploadField
-                label="Foto do Pod no Banner"
-                value={editingSlide.imageUrl}
-                onChange={(url) => setEditingSlide({ ...editingSlide, imageUrl: url })}
-                folderPrefix="banner"
-                helperText="Escolha a imagem do produto salva no computador (PNG transparente, JPG, WEBP)."
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setEditingSlide(null)}>
-              Cancelar
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+                queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+              }}
+              className="border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 gap-1.5"
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-primary" />
+              <span className="hidden sm:inline">Atualizar Dados</span>
             </Button>
-            <Button type="submit" size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold">
-              Salvar Slide
+
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onLogout}
+              className="text-xs gap-1.5 lg:hidden"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sair</span>
             </Button>
           </div>
-        </form>
-      )}
+        </header>
 
-      {/* Lista de Slides */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {banners.map((b, idx) => (
-          <div
-            key={b.id}
-            className={`rounded-2xl border p-4 backdrop-blur-sm transition-all flex flex-col justify-between ${
-              b.active ? "border-slate-800 bg-card/60" : "border-slate-800/40 bg-card/20 opacity-60"
-            }`}
-          >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase font-bold text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-full">
-                  Slide {idx + 1}
-                </span>
-
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-muted-foreground">{b.active ? "Ativo" : "Pausado"}</span>
-                  <Switch checked={b.active} onCheckedChange={() => handleToggleActive(b.id)} />
-                </div>
-              </div>
-
-              {b.imageUrl && (
-                <div className="relative h-28 w-full overflow-hidden rounded-xl border border-slate-800 bg-slate-950 flex items-center justify-center p-2">
-                  <img src={b.imageUrl} alt={b.title} className="h-full object-contain" />
-                </div>
-              )}
-
-              <div>
-                <p className="text-xs text-primary font-bold">{b.badge}</p>
-                <h3 className="text-base font-bold text-white">{b.title}</h3>
-                <p className="text-xs font-semibold text-slate-300">{b.puffs}</p>
-                <p className="mt-1.5 text-xs text-muted-foreground italic border-t border-slate-800/60 pt-1.5">
-                  “{b.footerPhrase}”
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-1.5 border-t border-slate-800 pt-3">
-              <Button size="sm" variant="ghost" onClick={() => setEditingSlide(b)} className="text-xs gap-1">
-                <Edit2 className="h-3.5 w-3.5 text-primary" />
-                Editar
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => handleDeleteSlide(b.id)} className="text-xs text-destructive hover:text-destructive">
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+        {/* MENU MOBILE EXPANSÍVEL */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-b border-slate-800 bg-slate-900 p-4 space-y-1.5 animate-in slide-in-from-top-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveSection(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold ${
+                    isActive ? "bg-primary text-white font-bold" : "text-slate-400 hover:bg-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className="h-4 w-4" />
+                    <span>{item.label}</span>
+                  </div>
+                  {item.badge !== null && item.badge > 0 && (
+                    <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        ))}
+        )}
+
+        {/* CORPO DO CONTEÚDO */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+          {activeSection === "dashboard" && (
+            <AdminDashboardSection
+              orders={orders}
+              products={rawProducts}
+              onNavigate={(section) => setActiveSection(section)}
+            />
+          )}
+
+          {activeSection === "pedidos" && <OrdersManagementSection orders={orders} />}
+
+          {activeSection === "produtos" && <ProductsManagementSection />}
+
+          {activeSection === "cidades" && <CitiesCommercialSection />}
+
+          {activeSection === "personalizar" && (
+            <CustomizeSiteSection settings={settings} onSaveSettings={saveSettings} />
+          )}
+
+          {activeSection === "clientes" && <CustomersCashbackSection orders={orders} />}
+
+          {activeSection === "configuracoes" && (
+            <GeneralSettingsSection
+              settings={settings}
+              onSaveSettings={saveSettings}
+              userEmail={userEmail}
+            />
+          )}
+        </main>
       </div>
     </div>
   );
 }
 
 // ==========================================
-// COMPONENTE: GERENCIADOR DE PRODUTOS
+// SEÇÃO 1: DASHBOARD EXECUTIVO COM DADOS REAIS
 // ==========================================
+function AdminDashboardSection({
+  orders,
+  products,
+  onNavigate,
+}: {
+  orders: any[];
+  products: any[];
+  onNavigate: (section: AdminSection) => void;
+}) {
+  // Cálculos com dados reais
+  const totalRevenue = useMemo(() => {
+    return orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  }, [orders]);
+
+  const pendingOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "pendente" || o.status === "aguardando_pagamento");
+  }, [orders]);
+
+  const completedOrders = useMemo(() => {
+    return orders.filter((o) => o.status === "entregue" || o.status === "pago");
+  }, [orders]);
+
+  const activeProducts = useMemo(() => {
+    return products.filter((p) => p.active !== false);
+  }, [products]);
+
+  const lowStockProducts = useMemo(() => {
+    return products.filter((p) => {
+      const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
+      if (inventories.length > 0) {
+        return inventories.some((inv: any) => inv.active && Number(inv.stock) <= 5);
+      }
+      return typeof p.stock === "number" && p.stock <= 5;
+    });
+  }, [products]);
+
+  const recentOrders = orders.slice(0, 5);
+
+  return (
+    <div className="space-y-6">
+      {/* Boas-vindas e Alertas */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/80 to-primary/10 p-5">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-400">
+            <CheckCircle2 className="h-3 w-3" />
+            Ambiente Operacional Ativo
+          </div>
+          <h2 className="mt-2 text-xl font-extrabold text-white">Visão Geral da Pantanal Smoke</h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Métricas em tempo real integradas com as praças de Cuiabá e São Paulo.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={() => onNavigate("pedidos")}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold gap-1.5 shadow-glow"
+          >
+            <Truck className="h-3.5 w-3.5" />
+            Ver Pedidos ({orders.length})
+          </Button>
+
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onNavigate("produtos")}
+            className="border-slate-800 hover:bg-slate-800 text-xs text-white gap-1.5"
+          >
+            <Plus className="h-3.5 w-3.5 text-primary" />
+            Novo Produto
+          </Button>
+        </div>
+      </div>
+
+      {/* 4 CARDS DE INDICADORES (KPIs REAIS) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Card 1: Faturamento */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Faturamento Registrado</span>
+            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-emerald-400">{formatBRL(totalRevenue)}</div>
+          <p className="text-[11px] text-slate-500">Total acumulado em pedidos registrados</p>
+        </div>
+
+        {/* Card 2: Pedidos Recebidos */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Total de Pedidos</span>
+            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+              <Truck className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-white">{orders.length}</div>
+          <p className="text-[11px] text-amber-400 font-semibold">
+            {pendingOrders.length} pedido(s) pendente(s) de envio
+          </p>
+        </div>
+
+        {/* Card 3: Produtos Cadastrados */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Produtos Cadastrados</span>
+            <div className="rounded-lg bg-purple-500/10 p-2 text-purple-400">
+              <ShoppingBag className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-white">{products.length}</div>
+          <p className="text-[11px] text-slate-400">{activeProducts.length} itens ativos no catálogo</p>
+        </div>
+
+        {/* Card 4: Estoque Baixo */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Atenção ao Estoque</span>
+            <div className="rounded-lg bg-rose-500/10 p-2 text-rose-400">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-rose-400">{lowStockProducts.length}</div>
+          <p className="text-[11px] text-slate-500">Produtos com 5 ou menos unidades</p>
+        </div>
+      </div>
+
+      {/* Grid: Pedidos Recentes + Alerta de Estoque */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Tabela de Pedidos Recentes (2 colunas) */}
+        <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div>
+              <h3 className="font-bold text-white text-sm">Pedidos Recentes</h3>
+              <p className="text-[11px] text-slate-400">Últimos pedidos recebidos no sistema</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onNavigate("pedidos")}
+              className="text-xs text-primary hover:text-primary/90"
+            >
+              Ver Todos →
+            </Button>
+          </div>
+
+          {recentOrders.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-500">
+              Nenhum pedido registrado até o momento.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/80">
+              {recentOrders.map((o) => (
+                <div key={o.id} className="py-3 flex items-center justify-between gap-3 text-xs">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{o.customer_name || "Cliente Pantanal"}</span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
+                        {o.city_id === "sao-paulo" ? "SP" : "Cuiabá"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      #{String(o.id).slice(0, 8)} · {new Date(o.created_at).toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+
+                  <div className="text-right space-y-1">
+                    <span className="font-bold text-emerald-400">{formatBRL(o.total || 0)}</span>
+                    <div>
+                      <span
+                        className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                          o.status === "entregue" || o.status === "pago"
+                            ? "bg-emerald-500/20 text-emerald-300"
+                            : o.status === "cancelado"
+                            ? "bg-rose-500/20 text-rose-300"
+                            : "bg-amber-500/20 text-amber-300"
+                        }`}
+                      >
+                        {o.status || "pendente"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Coluna Direita: Alertas & Ações Rápidas */}
+        <div className="space-y-4">
+          {/* Card: Produtos com Estoque Baixo */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 space-y-3">
+            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              Reposição Urgente
+            </h3>
+            {lowStockProducts.length === 0 ? (
+              <p className="text-xs text-slate-400">Todos os estoques estão abastecidos e saudáveis.</p>
+            ) : (
+              <div className="space-y-2">
+                {lowStockProducts.slice(0, 4).map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between text-xs p-2 rounded-xl bg-slate-950/60 border border-slate-800"
+                  >
+                    <span className="truncate max-w-[140px] font-medium text-slate-200">{p.name}</span>
+                    <span className="text-rose-400 font-bold">Estoque baixo</span>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onNavigate("produtos")}
+                  className="w-full text-xs border-slate-800 mt-2"
+                >
+                  Gerenciar Estoques
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Atalho para Cidades */}
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+            <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 text-primary" />
+              Gestão de Praças
+            </h4>
+            <p className="text-[11px] text-slate-400">
+              Alterne horários, taxas de entrega e disponibilidade específica para Cuiabá e São Paulo.
+            </p>
+            <Button
+              size="sm"
+              onClick={() => onNavigate("cidades")}
+              className="w-full text-xs bg-primary hover:bg-primary/90 text-white mt-1"
+            >
+              Configurar Cidades
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ==========================================
-// COMPONENTE: GERENCIADOR DE PRODUTOS
+// SEÇÃO 2: GESTÃO COMPLETA DE PEDIDOS
 // ==========================================
-function ProductsManagement() {
+function OrdersManagementSection({ orders }: { orders: any[] }) {
+  const queryClient = useQueryClient();
+  const [cityFilter, setCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      // Filtro de cidade
+      if (cityFilter !== "all") {
+        const orderCity = o.city_id || (o.address?.toLowerCase().includes("são paulo") ? "sao-paulo" : "cuiaba");
+        if (orderCity !== cityFilter) return false;
+      }
+
+      // Filtro de status
+      if (statusFilter !== "all" && o.status !== statusFilter) {
+        return false;
+      }
+
+      // Busca por cliente, telefone ou protocolo
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        const matchName = (o.customer_name || "").toLowerCase().includes(q);
+        const matchPhone = (o.phone || "").toLowerCase().includes(q);
+        const matchId = String(o.id || "").toLowerCase().includes(q);
+        if (!matchName && !matchPhone && !matchId) return false;
+      }
+
+      return true;
+    });
+  }, [orders, cityFilter, statusFilter, searchTerm]);
+
+  async function handleUpdateStatus(orderId: string, newStatus: string) {
+    try {
+      await supabase.from("orders").update({ status: newStatus }).eq("id", orderId);
+    } catch {
+      // ignora se offline
+    }
+
+    // Atualiza também no cache local
+    if (typeof window !== "undefined") {
+      try {
+        const cached = JSON.parse(localStorage.getItem("pantanal_saved_orders") || "[]");
+        const updated = cached.map((o: any) => (o.id === orderId ? { ...o, status: newStatus } : o));
+        localStorage.setItem("pantanal_saved_orders", JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Topo e Filtros */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" />
+            Central de Pedidos & Entregas
+          </h2>
+          <p className="text-xs text-slate-400">
+            Acompanhe pedidos recebidos de Cuiabá e São Paulo, consulte itens e despache entregas.
+          </p>
+        </div>
+
+        {/* Filtros em Barra */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Seletor de Cidade */}
+          <div className="flex items-center rounded-xl bg-slate-900 border border-slate-800 p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setCityFilter("all")}
+              className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                cityFilter === "all" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              onClick={() => setCityFilter("cuiaba")}
+              className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                cityFilter === "cuiaba" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Cuiabá
+            </button>
+            <button
+              type="button"
+              onClick={() => setCityFilter("sao-paulo")}
+              className={`px-3 py-1 rounded-lg font-semibold transition-colors ${
+                cityFilter === "sao-paulo" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              São Paulo
+            </button>
+          </div>
+
+          {/* Seletor de Situação */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-white"
+          >
+            <option value="all">Todos os Status</option>
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="enviado">Enviado</option>
+            <option value="entregue">Entregue</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Campo de Busca Rápida */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+        <Input
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Buscar por nome do cliente, telefone ou protocolo..."
+          className="pl-10 bg-slate-900/80 border-slate-800 text-xs text-white"
+        />
+      </div>
+
+      {/* Lista de Pedidos */}
+      {filteredOrders.length === 0 ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-slate-400 text-xs">
+          Nenhum pedido encontrado para os filtros selecionados.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((o) => {
+            const cleanPhone = (o.phone || "").replace(/\D/g, "");
+            const whatsLink = cleanPhone
+              ? `https://wa.me/55${cleanPhone}?text=Ol%C3%A1%20${encodeURIComponent(
+                  o.customer_name || ""
+                )}%2C%20sobre%20seu%20pedido%20na%20Pantanal%20Smoke...`
+              : null;
+            const isSP = o.city_id === "sao-paulo" || o.address?.toLowerCase().includes("são paulo");
+            const items = Array.isArray(o.items) ? o.items : [];
+
+            return (
+              <div
+                key={o.id}
+                className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4 backdrop-blur-sm transition-all hover:border-slate-700"
+              >
+                {/* Cabeçalho do Card */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
+                        isSP
+                          ? "border-cyan-500/40 bg-cyan-950/40 text-cyan-300"
+                          : "border-purple-500/40 bg-purple-950/40 text-purple-300"
+                      }`}
+                    >
+                      <MapPin className="h-3 w-3" />
+                      {isSP ? "São Paulo — SP" : "Cuiabá — MT"}
+                    </span>
+
+                    <div>
+                      <h3 className="font-bold text-white text-base">{o.customer_name || "Cliente Pantanal"}</h3>
+                      <p className="text-[11px] text-slate-400">
+                        Protocolo #{String(o.id).slice(0, 8)} · {new Date(o.created_at).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Badge de Pagamento */}
+                    <span
+                      className={`text-[11px] font-bold uppercase px-2.5 py-0.5 rounded-full border ${
+                        o.payment_status === "aprovado" || o.status === "pago"
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                          : "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                      }`}
+                    >
+                      {o.payment_status === "aprovado" || o.status === "pago"
+                        ? "Pagamento Confirmado"
+                        : "Aguardando Pagamento"}
+                    </span>
+
+                    {/* Status do Pedido */}
+                    <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30">
+                      {o.status || "pendente"}
+                    </span>
+
+                    <span className="text-lg font-extrabold text-emerald-400">
+                      {formatBRL(o.total || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Grid: Endereço & Contato */}
+                <div className="grid gap-3 sm:grid-cols-2 text-xs">
+                  <div className="rounded-xl bg-slate-950/50 p-3 border border-slate-800/80">
+                    <p className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-primary" /> Endereço de Entrega:
+                    </p>
+                    <p className="mt-1 text-slate-400 leading-relaxed">{o.address || "Endereço não informado"}</p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-950/50 p-3 border border-slate-800/80">
+                    <p className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-primary" /> Contato do Cliente:
+                    </p>
+                    <div className="flex items-center gap-3 mt-1 text-slate-400">
+                      <span>{o.phone || "Sem telefone"}</span>
+                      {whatsLink && (
+                        <a
+                          href={whatsLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 hover:underline"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" /> Chamar no WhatsApp
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lista de Itens do Pedido */}
+                {items.length > 0 && (
+                  <div className="rounded-xl border border-slate-800/60 bg-slate-950/30 p-3 space-y-1.5 text-xs">
+                    <p className="font-semibold text-slate-300 mb-1">Itens do Pedido:</p>
+                    {items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-slate-400 text-[11px]">
+                        <span>
+                          <strong>{item.qty}x</strong> {item.name}
+                        </span>
+                        <span>{formatBRL(Number(item.price || 0) * Number(item.qty || 1))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Rodapé e Ações do Pedido */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800/80 pt-3 text-xs">
+                  <div className="text-slate-400">
+                    Forma de pagamento:{" "}
+                    <strong className="text-white uppercase">{o.payment_method || "Online"}</strong>
+                    {o.cashback_used > 0 && (
+                      <span className="ml-2 text-emerald-400 font-semibold">
+                        (Usou {formatBRL(o.cashback_used)} de cashback)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleUpdateStatus(o.id, "pago")}
+                      className="text-xs text-emerald-400 border-slate-800 hover:bg-slate-800"
+                    >
+                      Aprovar Pagamento
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleUpdateStatus(o.id, "enviado")}
+                      className="text-xs text-primary border-slate-800 hover:bg-slate-800"
+                    >
+                      Despachar
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleUpdateStatus(o.id, "entregue")}
+                      className="text-xs text-cyan-400 border-slate-800 hover:bg-slate-800"
+                    >
+                      Marcar Entregue
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleUpdateStatus(o.id, "cancelado")}
+                      className="text-xs text-rose-400 hover:bg-rose-500/10"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// SEÇÃO 3: GESTÃO COMPLETA DO CATÁLOGO DE PRODUTOS
+// ==========================================
+function ProductsManagementSection() {
   const queryClient = useQueryClient();
   const { settings, saveSettings } = useStoreSettings();
+
   const [draft, setDraft] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
   const [selectedCityFilter, setSelectedCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
@@ -1420,7 +1379,6 @@ function ProductsManagement() {
           `)
           .order("category")
           .order("name");
-
         if (!error && data) return data;
         throw error;
       } catch {
@@ -1429,14 +1387,12 @@ function ProductsManagement() {
           .select("*")
           .order("category")
           .order("name");
-
         if (error) throw error;
         return data ?? [];
       }
     },
   });
 
-  // Ordena os produtos de acordo com a prioridade salva em StoreSettings
   const orderList = settings.productOrder || [];
   const sortedRawProducts = [...rawProducts].sort((a: any, b: any) => {
     const idxA = orderList.indexOf(a.id);
@@ -1447,18 +1403,14 @@ function ProductsManagement() {
     return (a.name || "").localeCompare(b.name || "");
   });
 
-  // Filtra produtos de acordo com o seletor de cidade
   const products = sortedRawProducts.filter((p: any) => {
     if (selectedCityFilter === "all") return true;
-
     const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
-    if (inventories.length === 0) return true; // Mostra fallback
-
+    if (inventories.length === 0) return true;
     const inv = inventories.find((i: any) => i.city_id === selectedCityFilter);
     return inv ? inv.active === true : false;
   });
 
-  // Mover produto na ordem (para cima ou para baixo)
   async function handleMoveProduct(productId: string, direction: "up" | "down") {
     const currentIds = sortedRawProducts.map((p: any) => p.id);
     const currentIndex = currentIds.indexOf(productId);
@@ -1477,6 +1429,27 @@ function ProductsManagement() {
     });
     queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
+  }
+
+  function openNewProduct() {
+    setDraft({
+      id: null,
+      name: "",
+      category: "Pod Descartável",
+      description: "",
+      flavor_profile: "",
+      intensity: "média",
+      image_url: "",
+      active: true,
+      availability: "both",
+      cuiaba_price: "99.90",
+      cuiaba_stock: 15,
+      sao_paulo_price: "99.90",
+      sao_paulo_stock: 15,
+      badge: "nenhum",
+      promo_price: "",
+      order_position: String(sortedRawProducts.length + 1),
+    });
   }
 
   function openEditProduct(p: any) {
@@ -1544,8 +1517,7 @@ function ProductsManagement() {
     if (productId) {
       const { error: updateErr } = await supabase.from("products").update(payload).eq("id", productId);
       if (updateErr) {
-        console.error("Erro ao atualizar produto:", updateErr);
-        alert(`Erro ao salvar produto: ${updateErr.message}`);
+        alert(`Erro ao atualizar produto: ${updateErr.message}`);
         setBusy(false);
         return;
       }
@@ -1553,95 +1525,65 @@ function ProductsManagement() {
       const { data: newProd, error: insertErr } = await supabase
         .from("products")
         .insert(payload)
-        .select("id")
+        .select()
         .single();
-      if (insertErr) {
-        console.error("Erro ao cadastrar produto:", insertErr);
-        alert(`Erro ao cadastrar produto: ${insertErr.message}`);
+      if (insertErr || !newProd) {
+        alert(`Erro ao cadastrar produto: ${insertErr?.message}`);
         setBusy(false);
         return;
       }
-      if (newProd) {
-        productId = newProd.id;
-      }
+      productId = newProd.id;
     }
 
-    // Upsert dos inventários independentes de cada cidade
-    if (productId) {
-      try {
-        const isCuiabaActive = draft.active && (draft.availability === "both" || draft.availability === "cuiaba");
-        const isSpActive = draft.active && (draft.availability === "both" || draft.availability === "sao-paulo");
+    // Atualiza inventários por cidade
+    const cuiabaActive = draft.active && (draft.availability === "both" || draft.availability === "cuiaba");
+    const spActive = draft.active && (draft.availability === "both" || draft.availability === "sao-paulo");
 
-        await (supabase.from("product_city_inventories") as any).upsert([
+    try {
+      await supabase.from("product_city_inventories").upsert(
+        [
           {
             product_id: productId,
             city_id: "cuiaba",
             price: cuiabaPrice,
             stock: Number(draft.cuiaba_stock) || 0,
-            active: isCuiabaActive,
-            updated_at: new Date().toISOString(),
+            active: cuiabaActive,
           },
           {
             product_id: productId,
             city_id: "sao-paulo",
             price: saoPauloPrice,
             stock: Number(draft.sao_paulo_stock) || 0,
-            active: isSpActive,
-            updated_at: new Date().toISOString(),
+            active: spActive,
           },
-        ], { onConflict: "product_id,city_id" });
-      } catch (invErr) {
-        console.warn("Aviso ao sincronizar product_city_inventories:", invErr);
-      }
-
-      // Atualiza badges, promo prices e ordenação em StoreSettings
-      try {
-        const updatedBadges = { ...(settings.productBadges || {}) };
-        if (draft.badge && draft.badge !== "nenhum") {
-          updatedBadges[productId] = draft.badge;
-        } else {
-          delete updatedBadges[productId];
-        }
-
-        const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
-        const numPromo = Number(String(draft.promo_price).replace(",", "."));
-        if (draft.badge === "promocao" && numPromo > 0) {
-          updatedPromoPrices[productId] = numPromo;
-        } else {
-          delete updatedPromoPrices[productId];
-        }
-
-        const allIds = sortedRawProducts.map((p: any) => p.id).filter((id: string) => id !== productId);
-        const targetPos = Math.max(1, Math.min(Number(draft.order_position) || (allIds.length + 1), allIds.length + 1));
-        allIds.splice(targetPos - 1, 0, productId);
-
-        await saveSettings({
-          ...settings,
-          productBadges: updatedBadges,
-          productPromoPrices: updatedPromoPrices,
-          productOrder: allIds,
-        });
-      } catch (stErr) {
-        console.warn("Aviso ao salvar destaques e ordenação:", stErr);
-      }
+        ],
+        { onConflict: "product_id,city_id" }
+      );
+    } catch (invErr) {
+      console.warn("Aviso ao sincronizar inventários:", invErr);
     }
 
-    setBusy(false);
-    setDraft(null);
-    queryClient.invalidateQueries({ queryKey: ["admin-products"] });
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-  }
-
-  async function handleDeleteProduct(id: string, name: string) {
-    if (!window.confirm(`Excluir produto "${name}"?`)) return;
-    await supabase.from("products").delete().eq("id", id);
-
-    // Remove do StoreSettings também
+    // Atualiza Destaques, Promoções e Ordenação
     const updatedBadges = { ...(settings.productBadges || {}) };
-    delete updatedBadges[id];
     const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
-    delete updatedPromoPrices[id];
-    const updatedOrder = (settings.productOrder || []).filter((item: string) => item !== id);
+
+    if (draft.badge && draft.badge !== "nenhum") {
+      updatedBadges[productId] = draft.badge;
+    } else {
+      delete updatedBadges[productId];
+    }
+
+    const promoPriceNum = Number(String(draft.promo_price).replace(",", "."));
+    if (promoPriceNum > 0) {
+      updatedPromoPrices[productId] = promoPriceNum;
+    } else {
+      delete updatedPromoPrices[productId];
+    }
+
+    let updatedOrder = [...(settings.productOrder || [])];
+    if (!updatedOrder.includes(productId)) {
+      updatedOrder.push(productId);
+    }
 
     await saveSettings({
       ...settings,
@@ -1650,535 +1592,408 @@ function ProductsManagement() {
       productOrder: updatedOrder,
     });
 
+    setBusy(false);
+    setDraft(null);
+    queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  }
+
+  async function handleDeleteProduct(productId: string) {
+    if (!confirm("Tem certeza que deseja excluir permanentemente este produto?")) return;
+    setBusy(true);
+
+    try {
+      await supabase.from("product_city_inventories").delete().eq("product_id", productId);
+      await supabase.from("products").delete().eq("id", productId);
+    } catch {
+      // ignore
+    }
+
+    const updatedBadges = { ...(settings.productBadges || {}) };
+    delete updatedBadges[productId];
+
+    const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
+    delete updatedPromoPrices[productId];
+
+    const updatedOrder = (settings.productOrder || []).filter((id) => id !== productId);
+
+    await saveSettings({
+      ...settings,
+      productBadges: updatedBadges,
+      productPromoPrices: updatedPromoPrices,
+      productOrder: updatedOrder,
+    });
+
+    setBusy(false);
     queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Topo do Catálogo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold text-white">Catálogo de Produtos Multicidade</h2>
-          <p className="text-xs text-muted-foreground">
-            Gerencie preços, estoques, destaques (Lançamento ou Promoção) e reordene os produtos na ordem que preferir.
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5 text-primary" />
+            Gestão do Catálogo de Produtos
+          </h2>
+          <p className="text-xs text-slate-400">
+            Cadastre, edite imagens, gerencie estoque por praça e organize a sequência do catálogo.
           </p>
         </div>
 
-        <Button
-          onClick={() =>
-            setDraft({
-              name: "",
-              category: "Essência",
-              description: "",
-              flavor_profile: "Frutado",
-              intensity: "média",
-              active: true,
-              image_url: "",
-              availability: "both",
-              cuiaba_price: "44.90",
-              cuiaba_stock: 15,
-              sao_paulo_price: "49.90",
-              sao_paulo_stock: 15,
-              badge: "nenhum",
-              promo_price: "",
-              order_position: String(rawProducts.length + 1),
-            })
-          }
-          className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Produto
-        </Button>
-      </div>
-
-      {/* Seletor / Filtro de Cidade do Painel */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-muted-foreground mr-1">Filtrar por praça:</span>
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("all")}
-            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "all"
-                ? "bg-primary text-primary-foreground shadow-glow"
-                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            Todos os produtos ({rawProducts.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("cuiaba")}
-            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "cuiaba"
-                ? "bg-primary text-primary-foreground shadow-glow"
-                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            📍 Cuiabá — MT
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("sao-paulo")}
-            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "sao-paulo"
-                ? "bg-primary text-primary-foreground shadow-glow"
-                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-            }`}
-          >
-            📍 São Paulo — SP
-          </button>
-        </div>
-
-        <div className="text-[11px] text-muted-foreground">
-          Use os botões <strong className="text-primary">↑</strong> e <strong className="text-primary">↓</strong> em cada card para definir a ordem exata do catálogo.
-        </div>
-      </div>
-
-      {/* Formulário de Cadastro / Edição com Preços e Estoques Independentes */}
-      {draft && (
-        <form onSubmit={handleSaveProduct} className="rounded-2xl border border-primary/40 bg-card/90 p-5 space-y-5 shadow-2xl backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              {draft.id ? "Editar Produto, Destaque & Ordem" : "Cadastrar Novo Produto Multicidade"}
-            </h3>
-            {draft.id && <span className="text-[11px] font-mono text-muted-foreground">{draft.id}</span>}
+          {/* Filtro de Cidade */}
+          <div className="flex items-center rounded-xl bg-slate-900 border border-slate-800 p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedCityFilter("all")}
+              className={`px-3 py-1 rounded-lg font-semibold ${
+                selectedCityFilter === "all" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCityFilter("cuiaba")}
+              className={`px-3 py-1 rounded-lg font-semibold ${
+                selectedCityFilter === "cuiaba" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Cuiabá
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedCityFilter("sao-paulo")}
+              className={`px-3 py-1 rounded-lg font-semibold ${
+                selectedCityFilter === "sao-paulo" ? "bg-primary text-white" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              São Paulo
+            </button>
           </div>
 
-          {/* Dados Principais do Produto */}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <Button
+            size="sm"
+            onClick={openNewProduct}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs gap-1.5 shadow-glow"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar Produto
+          </Button>
+        </div>
+      </div>
+
+      {/* Formulário / Modal de Criação / Edição */}
+      {draft && (
+        <form
+          onSubmit={handleSaveProduct}
+          className="rounded-2xl border border-primary/40 bg-slate-900/90 p-6 shadow-2xl backdrop-blur-xl space-y-5 animate-in fade-in"
+        >
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              {draft.id ? "Editar Produto Cadastrado" : "Cadastrar Novo Produto"}
+            </h3>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setDraft(null)} className="text-xs">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label className="text-xs font-semibold">Nome do Produto</Label>
+              <Label className="text-xs font-semibold text-slate-300">Nome do Produto</Label>
               <Input
-                required
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                placeholder="Ex: Essência Dubaim Apple"
-                className="mt-1 text-sm"
+                placeholder="Ex: Pod Descartável Ignite V80"
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+                required
               />
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Categoria</Label>
+              <Label className="text-xs font-semibold text-slate-300">Categoria</Label>
               <Input
-                required
                 value={draft.category}
                 onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                placeholder="Pod Descartável, Essência, Carvão..."
-                className="mt-1 text-sm"
+                placeholder="Ex: Pod Descartável, Essências, Narguilé"
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+                required
               />
             </div>
+          </div>
 
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Descrição Completa</Label>
+            <Textarea
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              placeholder="Descreva detalhes, capacidade, bateria, qualidade..."
+              rows={3}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <Label className="text-xs font-semibold">Perfil de Sabor</Label>
+              <Label className="text-xs font-semibold text-slate-300">Perfil de Sabor</Label>
               <Input
                 value={draft.flavor_profile}
                 onChange={(e) => setDraft({ ...draft, flavor_profile: e.target.value })}
-                placeholder="Menta, Cítrico, Frutas Vermelhas..."
-                className="mt-1 text-sm"
+                placeholder="Ex: Menta Gelada, Uva Ice"
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
               />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Intensidade</Label>
+              <select
+                value={draft.intensity}
+                onChange={(e) => setDraft({ ...draft, intensity: e.target.value })}
+                className="mt-1.5 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+              >
+                <option value="suave">Suave</option>
+                <option value="média">Média</option>
+                <option value="forte">Forte</option>
+              </select>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Disponibilidade por Praça</Label>
+              <select
+                value={draft.availability}
+                onChange={(e) => setDraft({ ...draft, availability: e.target.value })}
+                className="mt-1.5 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+              >
+                <option value="both">Ambas (Cuiabá e São Paulo)</option>
+                <option value="cuiaba">Apenas Cuiabá</option>
+                <option value="sao-paulo">Apenas São Paulo</option>
+              </select>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <div>
-              <ImageUploadField
-                label="Foto / Imagem do Produto"
-                value={draft.image_url}
-                onChange={(url) => setDraft({ ...draft, image_url: url })}
-                folderPrefix="produto"
-                helperText="Selecione a foto do produto salva no computador (PNG, JPG, WEBP, GIF). O cliente poderá clicar para vê-la ampliada."
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold">Descrição Completa do Produto</Label>
-              <Textarea
-                rows={3}
-                value={draft.description}
-                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                placeholder="Detalhes, especificações e diferenciais do produto (exibidos no modal de detalhes ao cliente clicar)..."
-                className="mt-1 text-xs"
-              />
-            </div>
+          {/* Upload de Imagem do Computador */}
+          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+            <ImageUploadField
+              label="Foto do Produto (Upload direto do computador)"
+              value={draft.image_url}
+              onChange={(url) => setDraft({ ...draft, image_url: url })}
+              folderPrefix="catalog"
+              helperText="Envie fotos em JPG, PNG ou WEBP diretamente do seu computador sem precisar colar link."
+            />
           </div>
 
-          {/* DESTAQUE E ORDENAÇÃO DO PRODUTO */}
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-4">
-            <div>
-              <Label className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-primary" />
-                Destaque do Produto no Catálogo (Lançamento ou Promoção)
-              </Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Escolha se este produto terá selo de destaque visual na vitrine e na página de detalhes.
-              </p>
-
-              <div className="mt-2.5 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, badge: "nenhum" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.badge === "nenhum" || !draft.badge
-                      ? "border-primary bg-primary/20 text-primary shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Sem Destaque
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, badge: "lancamento" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.badge === "lancamento"
-                      ? "border-purple-400 bg-purple-500/25 text-purple-200 shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  ⭐ Lançamento
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, badge: "promocao" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.badge === "promocao"
-                      ? "border-amber-400 bg-amber-500/25 text-amber-200 shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  🔥 Promoção
-                </button>
-              </div>
-            </div>
-
-            {/* Preço promocional e Posição na Ordem */}
-            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-800/80">
-              {draft.badge === "promocao" && (
+          {/* Preços e Estoques por Cidade */}
+          <div className="grid gap-4 sm:grid-cols-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+            <div className="space-y-3">
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Cuiabá — MT</span>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-[11px] font-semibold text-amber-300">
-                    Preço Promocional Promocional de Destaque (R$)
-                  </Label>
+                  <Label className="text-[11px] text-slate-400">Preço (R$)</Label>
                   <Input
-                    value={draft.promo_price}
-                    onChange={(e) => setDraft({ ...draft, promo_price: e.target.value })}
-                    placeholder="Ex: 79.90"
-                    className="mt-1 text-xs font-bold border-amber-500/40 focus:border-amber-400"
+                    value={draft.cuiaba_price}
+                    onChange={(e) => setDraft({ ...draft, cuiaba_price: e.target.value })}
+                    className="mt-1 bg-slate-950 border-slate-800 text-white"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    O preço original aparecerá riscado e o novo preço com destaque promocional.
-                  </p>
                 </div>
-              )}
+                <div>
+                  <Label className="text-[11px] text-slate-400">Estoque</Label>
+                  <Input
+                    type="number"
+                    value={draft.cuiaba_stock}
+                    onChange={(e) => setDraft({ ...draft, cuiaba_stock: Number(e.target.value) })}
+                    className="mt-1 bg-slate-950 border-slate-800 text-white"
+                  />
+                </div>
+              </div>
+            </div>
 
-              <div>
-                <Label className="text-[11px] font-semibold text-slate-300">
-                  Posição de Exibição no Catálogo (# Ordem)
-                </Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max={rawProducts.length + 1}
-                  value={draft.order_position}
-                  onChange={(e) => setDraft({ ...draft, order_position: e.target.value })}
-                  placeholder="1"
-                  className="mt-1 text-xs font-bold"
-                />
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  1 = primeiro produto da lista. O cliente verá os produtos nessa ordem exata.
-                </p>
+            <div className="space-y-3 border-t sm:border-t-0 sm:border-l border-slate-800 pt-3 sm:pt-0 sm:pl-4">
+              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">São Paulo — SP</span>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px] text-slate-400">Preço (R$)</Label>
+                  <Input
+                    value={draft.sao_paulo_price}
+                    onChange={(e) => setDraft({ ...draft, sao_paulo_price: e.target.value })}
+                    className="mt-1 bg-slate-950 border-slate-800 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px] text-slate-400">Estoque</Label>
+                  <Input
+                    type="number"
+                    value={draft.sao_paulo_stock}
+                    onChange={(e) => setDraft({ ...draft, sao_paulo_stock: Number(e.target.value) })}
+                    className="mt-1 bg-slate-950 border-slate-800 text-white"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* CONFIGURAÇÃO DE DISPONIBILIDADE POR CIDADE */}
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4 space-y-4">
+          {/* Destaques e Promoções */}
+          <div className="grid gap-4 sm:grid-cols-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
             <div>
-              <Label className="text-xs font-bold text-white uppercase tracking-wider">
-                Disponibilidade do Produto nas Praças
-              </Label>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, availability: "both" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.availability === "both"
-                      ? "border-primary bg-primary/20 text-primary shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  ✓ Ambas as Cidades
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, availability: "cuiaba" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.availability === "cuiaba"
-                      ? "border-primary bg-primary/20 text-primary shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Somente Cuiabá
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraft({ ...draft, availability: "sao-paulo" })}
-                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
-                    draft.availability === "sao-paulo"
-                      ? "border-primary bg-primary/20 text-primary shadow-glow"
-                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Somente São Paulo
-                </button>
-              </div>
+              <Label className="text-xs font-semibold text-slate-300">Selo de Destaque no Catálogo</Label>
+              <select
+                value={draft.badge}
+                onChange={(e) => setDraft({ ...draft, badge: e.target.value })}
+                className="mt-1.5 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white"
+              >
+                <option value="nenhum">Nenhum</option>
+                <option value="lancamento">🚀 Lançamento</option>
+                <option value="promocao">🔥 Super Promoção</option>
+              </select>
             </div>
 
-            {/* PREÇOS E ESTOQUES INDEPENDENTES */}
-            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-800/80">
-              {/* Box Cuiabá */}
-              <div
-                className={`rounded-xl border p-3.5 space-y-3 transition-opacity ${
-                  draft.availability === "both" || draft.availability === "cuiaba"
-                    ? "border-purple-500/40 bg-purple-950/15"
-                    : "border-slate-800/60 bg-slate-900/30 opacity-40 pointer-events-none"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-purple-400" /> Cuiabá — MT
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    {draft.availability === "sao-paulo" ? "Inativo nesta cidade" : "Ativo"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[11px] font-semibold text-slate-300">Preço Cuiabá (R$)</Label>
-                    <Input
-                      value={draft.cuiaba_price}
-                      onChange={(e) => setDraft({ ...draft, cuiaba_price: e.target.value })}
-                      placeholder="89.90"
-                      className="mt-1 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] font-semibold text-slate-300">Estoque Cuiabá (un.)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.cuiaba_stock}
-                      onChange={(e) => setDraft({ ...draft, cuiaba_stock: Number(e.target.value) })}
-                      placeholder="15"
-                      className="mt-1 text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Box São Paulo */}
-              <div
-                className={`rounded-xl border p-3.5 space-y-3 transition-opacity ${
-                  draft.availability === "both" || draft.availability === "sao-paulo"
-                    ? "border-cyan-500/40 bg-cyan-950/15"
-                    : "border-slate-800/60 bg-slate-900/30 opacity-40 pointer-events-none"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-cyan-400" /> São Paulo — SP
-                  </span>
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    {draft.availability === "cuiaba" ? "Inativo nesta cidade" : "Ativo"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[11px] font-semibold text-slate-300">Preço SP (R$)</Label>
-                    <Input
-                      value={draft.sao_paulo_price}
-                      onChange={(e) => setDraft({ ...draft, sao_paulo_price: e.target.value })}
-                      placeholder="94.90"
-                      className="mt-1 text-xs font-bold"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[11px] font-semibold text-slate-300">Estoque SP (un.)</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={draft.sao_paulo_stock}
-                      onChange={(e) => setDraft({ ...draft, sao_paulo_stock: Number(e.target.value) })}
-                      placeholder="15"
-                      className="mt-1 text-xs font-bold"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Preço Promocional (Opcional)</Label>
+              <Input
+                value={draft.promo_price}
+                onChange={(e) => setDraft({ ...draft, promo_price: e.target.value })}
+                placeholder="Ex: 89.90 (risca o preço original)"
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              />
             </div>
           </div>
 
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between border-t border-slate-800 pt-4">
             <div className="flex items-center gap-2">
-              <Switch checked={draft.active} onCheckedChange={(val) => setDraft({ ...draft, active: val })} />
-              <span className="text-xs text-slate-200">Produto ativo e disponível para venda</span>
+              <Switch
+                checked={draft.active}
+                onCheckedChange={(checked) => setDraft({ ...draft, active: checked })}
+              />
+              <span className="text-xs text-slate-300 font-semibold">
+                {draft.active ? "Produto Ativo na Loja" : "Produto Pausado (Oculto)"}
+              </span>
             </div>
 
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setDraft(null)} className="text-xs">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={busy} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow text-xs">
-                {busy ? "Salvando..." : "Salvar Produto & Configurações"}
+              <Button type="submit" disabled={busy} size="sm" className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs">
+                {busy ? <RefreshCw className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+                Salvar Produto
               </Button>
             </div>
           </div>
         </form>
       )}
 
-      {/* Grid de Produtos Cadastrados */}
+      {/* Lista de Produtos do Catálogo */}
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Carregando catálogo...</p>
+        <div className="py-12 text-center text-xs text-slate-500">Carregando catálogo de produtos...</div>
       ) : products.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-card/40 p-10 text-center text-muted-foreground text-xs">
-          Nenhum produto cadastrado para a praça selecionada.
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-12 text-center text-slate-400 text-xs">
+          Nenhum produto cadastrado para a visualização selecionada.
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p: any, index: number) => {
+          {products.map((p, idx) => {
+            const badge = (settings.productBadges && settings.productBadges[p.id]) || "nenhum";
+            const promoPrice = (settings.productPromoPrices && settings.productPromoPrices[p.id]) || null;
             const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
             const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
             const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
 
-            const isCuiabaActive = cuiabaInv ? cuiabaInv.active : true;
-            const isSpActive = spInv ? spInv.active : true;
-
-            const cuiabaPrice = cuiabaInv ? Number(cuiabaInv.price) : Number(p.price);
-            const cuiabaStock = cuiabaInv ? Number(cuiabaInv.stock) : 15;
-            const spPrice = spInv ? Number(spInv.price) : Number(p.price);
-            const spStock = spInv ? Number(spInv.stock) : 15;
-
-            const badge = (settings.productBadges && settings.productBadges[p.id]) || "nenhum";
-            const promoPrice = (settings.productPromoPrices && settings.productPromoPrices[p.id]) || null;
-            const isFirst = index === 0;
-            const isLast = index === products.length - 1;
-
             return (
-              <div key={p.id} className="rounded-2xl border border-slate-800 bg-card/60 p-4 flex flex-col justify-between hover:border-primary/50 transition-colors">
-                <div>
-                  {/* Topo do Card com Posição, Badge e Status */}
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80">
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex h-5 w-6 items-center justify-center rounded-md bg-primary/20 text-[10px] font-mono font-bold text-primary">
-                        #{index + 1}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
-                    </div>
+              <div
+                key={p.id}
+                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 flex flex-col justify-between space-y-3 transition-all hover:border-slate-700"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 bg-slate-950 px-2 py-0.5 rounded-full border border-slate-800">
+                      Posição #{idx + 1}
+                    </span>
 
-                    <div className="flex items-center gap-1.5">
-                      {badge === "lancamento" && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                          ⭐ LANÇAMENTO
-                        </span>
-                      )}
-                      {badge === "promocao" && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                          🔥 PROMOÇÃO
-                        </span>
-                      )}
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                        {p.active ? "Ativo" : "Pausado"}
-                      </span>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveProduct(p.id, "up")}
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                        title="Subir posição no catálogo"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={idx === products.length - 1}
+                        onClick={() => handleMoveProduct(p.id, "down")}
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-white"
+                        title="Descer posição no catálogo"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
-                    {p.image_url ? (
-                      <div className="h-14 w-14 rounded-xl border border-slate-800 bg-slate-950 p-1 shrink-0 flex items-center justify-center overflow-hidden">
-                        <AdminProductThumbnail url={p.image_url} alt={p.name} />
-                      </div>
-                    ) : null}
+                  <div className="flex gap-3 items-center">
+                    <div className="h-16 w-16 shrink-0 rounded-xl border border-slate-800 bg-slate-950 p-1 flex items-center justify-center overflow-hidden">
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.name} className="h-full w-full object-contain" />
+                      ) : (
+                        <ShoppingBag className="h-6 w-6 text-slate-700" />
+                      )}
+                    </div>
+
                     <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-white text-sm truncate">{p.name}</h4>
-                      {p.flavor_profile && (
-                        <p className="text-[11px] text-muted-foreground mt-0.5 truncate">Sabor: {p.flavor_profile}</p>
-                      )}
-                      {promoPrice && (
-                        <p className="text-[11px] font-bold text-amber-400 mt-0.5">
-                          Preço Promo: {formatBRL(promoPrice)}
-                        </p>
-                      )}
+                      <p className="text-[11px] text-slate-400">{p.category}</p>
+
+                      <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                        {badge === "lancamento" && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+                            LANÇAMENTO
+                          </span>
+                        )}
+                        {badge === "promocao" && (
+                          <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                            PROMOÇÃO
+                          </span>
+                        )}
+                        <span className="text-xs font-black text-emerald-400">
+                          {promoPrice ? formatBRL(promoPrice) : formatBRL(p.price)}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Detalhes de Preço e Estoque por Cidade */}
-                  <div className="mt-3 space-y-1.5 border-t border-slate-800/80 pt-2.5 text-xs">
-                    <div className="flex items-center justify-between rounded-lg bg-slate-900/60 px-2 py-1">
-                      <span className="text-[11px] font-semibold text-purple-300 flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-purple-400" /> Cuiabá:
-                      </span>
-                      {isCuiabaActive ? (
-                        <div className="flex items-center gap-2">
-                          <strong className="text-white font-bold">{formatBRL(cuiabaPrice)}</strong>
-                          <span className="text-[10px] text-muted-foreground">({cuiabaStock} un.)</span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-rose-400 italic">Indisponível</span>
-                      )}
+                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-400 border-t border-slate-800/80 pt-2">
+                    <div>
+                      Cuiabá: <strong className="text-white">{cuiabaInv ? `${cuiabaInv.stock} un` : "15 un"}</strong>
                     </div>
-
-                    <div className="flex items-center justify-between rounded-lg bg-slate-900/60 px-2 py-1">
-                      <span className="text-[11px] font-semibold text-cyan-300 flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-cyan-400" /> São Paulo:
-                      </span>
-                      {isSpActive ? (
-                        <div className="flex items-center gap-2">
-                          <strong className="text-white font-bold">{formatBRL(spPrice)}</strong>
-                          <span className="text-[10px] text-muted-foreground">({spStock} un.)</span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-rose-400 italic">Indisponível</span>
-                      )}
+                    <div>
+                      São Paulo: <strong className="text-white">{spInv ? `${spInv.stock} un` : "15 un"}</strong>
                     </div>
                   </div>
                 </div>
 
-                {/* Ações: Reordenação (↑ / ↓) + Editar / Excluir */}
-                <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2">
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={isFirst}
-                      onClick={() => handleMoveProduct(p.id, "up")}
-                      title="Mover produto para cima"
-                      className="h-7 w-7 p-0 text-slate-400 hover:text-primary hover:bg-slate-800 disabled:opacity-30"
-                    >
-                      <ArrowUp className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={isLast}
-                      onClick={() => handleMoveProduct(p.id, "down")}
-                      title="Mover produto para baixo"
-                      className="h-7 w-7 p-0 text-slate-400 hover:text-primary hover:bg-slate-800 disabled:opacity-30"
-                    >
-                      <ArrowDown className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => openEditProduct(p)} className="h-7 px-2 text-xs gap-1">
-                      <Edit2 className="h-3.5 w-3.5 text-primary" />
-                      Editar
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(p.id, p.name)} className="h-7 px-2 text-xs text-destructive hover:text-destructive">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                <div className="flex items-center justify-end gap-1.5 border-t border-slate-800/80 pt-2.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => openEditProduct(p)}
+                    className="text-xs text-primary hover:text-primary/90 h-8 gap-1"
+                  >
+                    <Edit2 className="h-3.5 w-3.5" /> Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDeleteProduct(p.id)}
+                    className="text-xs text-rose-400 hover:text-rose-300 h-8"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
             );
@@ -2190,210 +2005,821 @@ function ProductsManagement() {
 }
 
 // ==========================================
-// COMPONENTE: GERENCIADOR DE PEDIDOS
+// SEÇÃO 4: CIDADES & CONFIGURAÇÕES COMERCIAIS
 // ==========================================
-function OrdersManagement() {
-  const queryClient = useQueryClient();
-  const [selectedCityFilter, setSelectedCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
+function CitiesCommercialSection() {
+  const { settings, saveSettings } = useStoreSettings();
+  const [formData, setFormData] = useState<StoreSettings>(settings);
+  const [saved, setSaved] = useState(false);
 
-  const { data: rawOrders = [], isLoading } = useQuery({
-    queryKey: ["admin-orders"],
+  useEffect(() => {
+    setFormData(settings);
+  }, [settings]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await saveSettings(formData);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-primary" />
+            Gestão Comercial por Cidade
+          </h2>
+          <p className="text-xs text-slate-400">
+            Administre regras específicas, disponibilidade de entrega e horários para Cuiabá e São Paulo.
+          </p>
+        </div>
+
+        <Button type="submit" className="bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-1.5 shadow-glow">
+          <Save className="h-4 w-4" />
+          Salvar Regras Comerciais
+        </Button>
+      </div>
+
+      {saved && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Regras comerciais salvas com sucesso!
+        </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* CARD: CUIABÁ */}
+        <div className="rounded-2xl border border-purple-500/30 bg-slate-900/70 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="font-bold text-white text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-purple-400" />
+              Praça Cuiabá — MT
+            </h3>
+            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+              Taxa Fixa R$ 10,00
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Taxa Fixa de Entrega (R$)</Label>
+              <Input
+                type="number"
+                step="0.5"
+                value={formData.deliveryFeeCuiaba}
+                onChange={(e) => setFormData({ ...formData, deliveryFeeCuiaba: Number(e.target.value) })}
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                Padrão oficial da loja para entrega em todos os bairros de Cuiabá.
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Horário e Prazos de Atendimento</Label>
+              <Input
+                value={formData.openingHours}
+                onChange={(e) => setFormData({ ...formData, openingHours: e.target.value })}
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* CARD: SÃO PAULO */}
+        <div className="rounded-2xl border border-cyan-500/30 bg-slate-900/70 p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 className="font-bold text-white text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-cyan-400" />
+              Praça São Paulo — SP
+            </h3>
+            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">
+              Entrega Prática
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs">
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Regra de Entrega em SP</Label>
+              <Input
+                value="Frete Grátis em bairros selecionados / Expresso sob consulta"
+                readOnly
+                disabled
+                className="mt-1.5 bg-slate-950/40 border-slate-800 text-slate-400"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">
+                A entrega em São Paulo é calculada conforme o bairro e modalidade combinada no checkout.
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Prazos de São Paulo</Label>
+              <Input
+                value="Entregas no mesmo dia ou agendadas conforme disponibilidade"
+                readOnly
+                disabled
+                className="mt-1.5 bg-slate-950/40 border-slate-800 text-slate-400"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Regra de Cashback */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2">
+          <Coins className="h-4 w-4 text-amber-400" />
+          Regra de Cashback (5% para Clientes Cadastrados)
+        </h3>
+
+        <div className="grid gap-4 sm:grid-cols-2 text-xs">
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Título do Cashback na Loja</Label>
+            <Input
+              value={formData.cashbackTitle}
+              onChange={(e) => setFormData({ ...formData, cashbackTitle: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Percentual de Retorno</Label>
+            <Input
+              value="5% em todas as compras para clientes com login"
+              disabled
+              readOnly
+              className="mt-1.5 bg-slate-950/40 border-slate-800 text-slate-400"
+            />
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+// ==========================================
+// SEÇÃO 5: PERSONALIZAR SITE
+// ==========================================
+function CustomizeSiteSection({
+  settings,
+  onSaveSettings,
+}: {
+  settings: StoreSettings;
+  onSaveSettings: (settings: StoreSettings) => Promise<void>;
+}) {
+  const [formData, setFormData] = useState<StoreSettings>(settings);
+  const [editingSlide, setEditingSlide] = useState<BannerSlide | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setFormData(settings);
+  }, [settings]);
+
+  const faqs = formData.faqs || DEFAULT_STORE_SETTINGS.faqs;
+
+  function handleAddFaq() {
+    setFormData({
+      ...formData,
+      faqs: [...faqs, { id: `faq-${Date.now()}`, question: "", answer: "" }],
+    });
+  }
+
+  function handleRemoveFaq(index: number) {
+    const updated = faqs.filter((_, i) => i !== index);
+    setFormData({ ...formData, faqs: updated });
+  }
+
+  function handleFaqChange(index: number, field: "question" | "answer", value: string) {
+    const updated = [...faqs];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, faqs: updated });
+  }
+
+  async function handleToggleBanner(slideId: string) {
+    const updated = formData.banners.map((b) => (b.id === slideId ? { ...b, active: !b.active } : b));
+    setFormData({ ...formData, banners: updated });
+    await onSaveSettings({ ...formData, banners: updated });
+  }
+
+  async function handleSaveSlide(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingSlide) return;
+
+    const exists = formData.banners.some((b) => b.id === editingSlide.id);
+    let updated: BannerSlide[];
+    if (exists) {
+      updated = formData.banners.map((b) => (b.id === editingSlide.id ? editingSlide : b));
+    } else {
+      updated = [...formData.banners, editingSlide];
+    }
+
+    setFormData({ ...formData, banners: updated });
+    await onSaveSettings({ ...formData, banners: updated });
+    setEditingSlide(null);
+  }
+
+  async function handleDeleteSlide(slideId: string) {
+    if (!confirm("Deseja remover este slide?")) return;
+    const updated = formData.banners.filter((b) => b.id !== slideId);
+    setFormData({ ...formData, banners: updated });
+    await onSaveSettings({ ...formData, banners: updated });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await onSaveSettings(formData);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Palette className="h-5 w-5 text-primary" />
+            Personalizar Página Inicial & Conteúdos
+          </h2>
+          <p className="text-xs text-slate-400">
+            Edite banners, anúncios, textos de destaque, Sobre Nós e Perguntas Frequentes diretamente pelo painel.
+          </p>
+        </div>
+
+        <Button type="submit" className="bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-1.5 shadow-glow">
+          <Save className="h-4 w-4" />
+          Salvar Todas as Alterações
+        </Button>
+      </div>
+
+      {saved && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Alterações salvas e publicadas em todo o site com sucesso!
+        </div>
+      )}
+
+      {/* BLOCO 1: BANNERS E CARROSSEL PRINCIPAL */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 className="font-bold text-white text-sm flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              Carrossel de Banners da Página Inicial
+            </h3>
+            <p className="text-[11px] text-slate-400">Alterne e edite os slides em destaque na loja</p>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={() =>
+              setEditingSlide({
+                id: `slide-${Date.now()}`,
+                badge: "🔥 LANÇAMENTO EXCLUSIVO",
+                title: "Novo Pod Descartável",
+                puffs: "8000 PUFFS",
+                footerPhrase: "Conecte-se à sua vibe",
+                imageUrl: "",
+                active: true,
+                order: formData.banners.length + 1,
+              })
+            }
+            className="text-xs bg-slate-800 hover:bg-slate-700 text-white"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Novo Slide
+          </Button>
+        </div>
+
+        {/* Modal de Edição de Slide */}
+        {editingSlide && (
+          <div className="rounded-xl border border-primary/40 bg-slate-950 p-4 space-y-3">
+            <h4 className="text-xs font-bold text-white">Editar Slide do Carrossel</h4>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="text-[11px]">Badge / Selo</Label>
+                <Input
+                  value={editingSlide.badge}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, badge: e.target.value })}
+                  className="mt-1 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-[11px]">Título</Label>
+                <Input
+                  value={editingSlide.title}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
+                  className="mt-1 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-[11px]">Puffs / Destaque</Label>
+                <Input
+                  value={editingSlide.puffs}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, puffs: e.target.value })}
+                  className="mt-1 text-xs"
+                />
+              </div>
+            </div>
+
+            <div>
+              <ImageUploadField
+                label="Imagem do Slide (Upload do Computador)"
+                value={editingSlide.imageUrl}
+                onChange={(url) => setEditingSlide({ ...editingSlide, imageUrl: url })}
+                folderPrefix="banners"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setEditingSlide(null)} className="text-xs">
+                Cancelar
+              </Button>
+              <Button type="button" size="sm" onClick={handleSaveSlide} className="bg-primary text-white text-xs">
+                Salvar Slide
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          {formData.banners.map((b, idx) => (
+            <div key={b.id} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-primary font-bold">Slide #{idx + 1}</span>
+                <Switch checked={b.active} onCheckedChange={() => handleToggleBanner(b.id)} />
+              </div>
+              <h5 className="font-bold text-white truncate">{b.title}</h5>
+              <p className="text-[11px] text-slate-400">{b.puffs}</p>
+              <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-800/80">
+                <Button size="sm" variant="ghost" onClick={() => setEditingSlide(b)} className="h-7 text-xs text-primary">
+                  Editar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => handleDeleteSlide(b.id)} className="h-7 text-xs text-rose-400">
+                  Excluir
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* BLOCO 2: ELEMENTOS DE DESTAQUE DA HOME */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-3">
+          <Sliders className="h-4 w-4 text-primary" />
+          Textos de Destaque da Loja
+        </h3>
+
+        <div className="grid gap-4 sm:grid-cols-2 text-xs">
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Barra de Anúncio Superior</Label>
+            <Input
+              value={formData.announcementText}
+              onChange={(e) => setFormData({ ...formData, announcementText: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <Switch
+                checked={formData.announcementActive}
+                onCheckedChange={(c) => setFormData({ ...formData, announcementActive: c })}
+              />
+              <span className="text-[11px] text-slate-400">Exibir barra de anúncio no topo</span>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Frase de Destaque Principal</Label>
+            <Input
+              value={formData.homeHighlightPhrase}
+              onChange={(e) => setFormData({ ...formData, homeHighlightPhrase: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* BLOCO 3: TEXTOS INSTITUCIONAIS (SOBRE NÓS & FAQ) */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-5">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-3">
+          <FileText className="h-4 w-4 text-primary" />
+          Conteúdos Institucionais (Sobre Nós & Perguntas Frequentes)
+        </h3>
+
+        {/* Sobre Nós */}
+        <div className="space-y-3 text-xs">
+          <h4 className="font-bold text-purple-300 uppercase text-[11px]">Página Sobre Nós</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-[11px] text-slate-400">Título</Label>
+              <Input
+                value={formData.aboutUsTitle}
+                onChange={(e) => setFormData({ ...formData, aboutUsTitle: e.target.value })}
+                className="mt-1 bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+            <div>
+              <Label className="text-[11px] text-slate-400">Frase da Marca</Label>
+              <Input
+                value={formData.aboutUsBrandPhrase}
+                onChange={(e) => setFormData({ ...formData, aboutUsBrandPhrase: e.target.value })}
+                className="mt-1 bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-[11px] text-slate-400">Parágrafos da História (1, 2 e 3)</Label>
+            <div className="space-y-2 mt-1">
+              <Textarea
+                rows={2}
+                value={formData.aboutUsParagraph1}
+                onChange={(e) => setFormData({ ...formData, aboutUsParagraph1: e.target.value })}
+                className="bg-slate-950 border-slate-800 text-xs text-white"
+              />
+              <Textarea
+                rows={2}
+                value={formData.aboutUsParagraph2}
+                onChange={(e) => setFormData({ ...formData, aboutUsParagraph2: e.target.value })}
+                className="bg-slate-950 border-slate-800 text-xs text-white"
+              />
+              <Textarea
+                rows={2}
+                value={formData.aboutUsParagraph3}
+                onChange={(e) => setFormData({ ...formData, aboutUsParagraph3: e.target.value })}
+                className="bg-slate-950 border-slate-800 text-xs text-white"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Perguntas Frequentes (FAQ) */}
+        <div className="space-y-3 text-xs border-t border-slate-800 pt-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-bold text-purple-300 uppercase text-[11px]">Perguntas Frequentes (FAQ)</h4>
+            <Button type="button" size="sm" onClick={handleAddFaq} className="text-xs bg-slate-800 text-white">
+              <Plus className="h-3 w-3 mr-1" /> Nova Pergunta
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {faqs.map((faq, idx) => (
+              <div key={faq.id || idx} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-primary">Pergunta #{idx + 1}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleRemoveFaq(idx)}
+                    className="h-6 w-6 p-0 text-rose-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <Input
+                  value={faq.question}
+                  onChange={(e) => handleFaqChange(idx, "question", e.target.value)}
+                  placeholder="Pergunta..."
+                  className="bg-slate-950 text-xs text-white border-slate-800"
+                />
+                <Textarea
+                  rows={2}
+                  value={faq.answer}
+                  onChange={(e) => handleFaqChange(idx, "answer", e.target.value)}
+                  placeholder="Resposta..."
+                  className="bg-slate-950 text-xs text-white border-slate-800"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+// ==========================================
+// SEÇÃO 6: CLIENTES & CASHBACK
+// ==========================================
+function CustomersCashbackSection({ orders }: { orders: any[] }) {
+  const { data: rawProfiles = [], isLoading } = useQuery({
+    queryKey: ["admin-profiles"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      return data ?? [];
+      try {
+        const { data, error } = await supabase.from("profiles").select("*").limit(100);
+        if (!error && data) return data;
+      } catch {
+        // ignore
+      }
+      return [];
     },
   });
 
-  const orders = rawOrders.filter((o: any) => {
-    if (selectedCityFilter === "all") return true;
-    const orderCity = (o.city_id || (o.address?.toLowerCase().includes("são paulo") ? "sao-paulo" : "cuiaba"));
-    return orderCity === selectedCityFilter;
+  const { data: cashbackHistory = [] } = useQuery({
+    queryKey: ["admin-cashback-history"],
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from("cashback_entries")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(50);
+        if (!error && data) return data;
+      } catch {
+        // ignore
+      }
+      return [];
+    },
   });
 
-  async function handleUpdateOrderStatus(id: string, newStatus: string) {
-    await supabase.from("orders").update({ status: newStatus }).eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+  const totalCashbackUsed = useMemo(() => {
+    return orders.reduce((sum, o) => sum + (Number(o.cashback_used) || 0), 0);
+  }, [orders]);
+
+  return (
+    <div className="space-y-6">
+      <div className="border-b border-slate-800 pb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <Coins className="h-5 w-5 text-amber-400" />
+          Clientes Cadastrados & Gestão de Cashback
+        </h2>
+        <p className="text-xs text-slate-400">
+          Visualize os clientes autenticados, saldos de cashback e histórico de lançamentos.
+        </p>
+      </div>
+
+      {/* Indicadores de Cashback */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-1">
+          <span className="text-xs text-slate-400">Total de Clientes Registrados</span>
+          <div className="text-2xl font-bold text-white">{rawProfiles.length}</div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-1">
+          <span className="text-xs text-slate-400">Cashback Total Resgatado</span>
+          <div className="text-2xl font-bold text-emerald-400">{formatBRL(totalCashbackUsed)}</div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-1">
+          <span className="text-xs text-slate-400">Regra Ativa</span>
+          <div className="text-2xl font-bold text-amber-400">5% por Compra</div>
+        </div>
+      </div>
+
+      {/* Tabela de Clientes */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          Base de Clientes
+        </h3>
+
+        {isLoading ? (
+          <p className="text-xs text-slate-400">Carregando clientes...</p>
+        ) : rawProfiles.length === 0 ? (
+          <p className="text-xs text-slate-400">Nenhum cliente cadastrado no momento.</p>
+        ) : (
+          <div className="divide-y divide-slate-800/80">
+            {rawProfiles.map((p) => (
+              <div key={p.id} className="py-2.5 flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-bold text-white">{p.name || "Cliente Pantanal"}</p>
+                  <p className="text-[11px] text-slate-500">ID: {p.id}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-emerald-400 font-bold text-[11px]">Elegível a 5% de Cashback</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Histórico Recente de Cashback */}
+      {cashbackHistory.length > 0 && (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-4">
+          <h3 className="font-bold text-white text-sm flex items-center gap-2">
+            <Coins className="h-4 w-4 text-amber-400" />
+            Extrato Recente de Lançamentos
+          </h3>
+
+          <div className="divide-y divide-slate-800/80">
+            {cashbackHistory.slice(0, 8).map((entry) => (
+              <div key={entry.id} className="py-2.5 flex items-center justify-between text-xs">
+                <div>
+                  <p className="font-semibold text-slate-200">{entry.note || "Movimentação de cashback"}</p>
+                  <p className="text-[11px] text-slate-500">{new Date(entry.created_at).toLocaleString("pt-BR")}</p>
+                </div>
+                <span
+                  className={`font-bold ${
+                    entry.amount >= 0 ? "text-emerald-400" : "text-amber-400"
+                  }`}
+                >
+                  {entry.amount >= 0 ? `+${formatBRL(entry.amount)}` : formatBRL(entry.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// SEÇÃO 7: CONFIGURAÇÕES GERAIS & SEGURANÇA
+// ==========================================
+function GeneralSettingsSection({
+  settings,
+  onSaveSettings,
+  userEmail,
+}: {
+  settings: StoreSettings;
+  onSaveSettings: (settings: StoreSettings) => Promise<void>;
+  userEmail: string;
+}) {
+  const [formData, setFormData] = useState<StoreSettings>(settings);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [savedSettings, setSavedSettings] = useState(false);
+
+  useEffect(() => {
+    setFormData(settings);
+  }, [settings]);
+
+  async function handleSaveSettings(e: React.FormEvent) {
+    e.preventDefault();
+    await onSaveSettings(formData);
+    setSavedSettings(true);
+    setTimeout(() => setSavedSettings(false), 3000);
+  }
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (newPassword.length < 6) {
+      setPasswordError("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("As senhas informadas não coincidem.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    const result = await updateAdminPassword(newPassword);
+    if (result.success) {
+      setPasswordSuccess("Senha master atualizada com sucesso no Supabase Auth!");
+      setNewPassword("");
+      setConfirmPassword("");
+    } else {
+      setPasswordError(result.error || "Erro ao atualizar senha.");
+    }
+    setIsUpdatingPassword(false);
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-white">Gestão de Pedidos & Entregas por Cidade</h2>
-          <p className="text-xs text-muted-foreground">
-            Acompanhe pedidos recebidos em Cuiabá e São Paulo, aprove pagamentos e despache entregas.
+      <div className="border-b border-slate-800 pb-4">
+        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+          <Settings className="h-5 w-5 text-primary" />
+          Configurações Gerais & Segurança Master
+        </h2>
+        <p className="text-xs text-slate-400">
+          Gerencie dados mestres de contato, WhatsApp e segurança da conta administrativa.
+        </p>
+      </div>
+
+      {savedSettings && (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Configurações salvas com sucesso!
+        </div>
+      )}
+
+      {/* Formulário de Dados Gerais */}
+      <form onSubmit={handleSaveSettings} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-3">
+          <Sliders className="h-4 w-4 text-primary" />
+          Dados Mestres da Loja
+        </h3>
+
+        <div className="grid gap-4 sm:grid-cols-2 text-xs">
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Nome Oficial da Loja</Label>
+            <Input
+              value={formData.siteName}
+              onChange={(e) => setFormData({ ...formData, siteName: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Slogan</Label>
+            <Input
+              value={formData.slogan}
+              onChange={(e) => setFormData({ ...formData, slogan: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">WhatsApp Master da Loja</Label>
+            <Input
+              value={formData.whatsappNumber}
+              onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Mensagem Padrão do WhatsApp</Label>
+            <Input
+              value={formData.whatsappMessage}
+              onChange={(e) => setFormData({ ...formData, whatsappMessage: e.target.value })}
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-3">
+          <Button type="submit" className="bg-primary hover:bg-primary/90 text-white text-xs font-bold gap-1.5 shadow-glow">
+            <Save className="h-4 w-4" /> Salvar Dados Mestres
+          </Button>
+        </div>
+      </form>
+
+      {/* Alteração Segura de Senha Master */}
+      <form onSubmit={handlePasswordChange} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-3">
+          <Lock className="h-4 w-4 text-primary" />
+          Segurança da Conta Administrativa (Supabase Auth)
+        </h3>
+
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-slate-300">
+          <p>
+            Usuário conectado: <strong className="text-white">{userEmail || ADMIN_CONFIG.email}</strong>
+          </p>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            Autenticado com validação direta de permissão de administrador no banco de dados.
           </p>
         </div>
 
-        {/* Filtro de Cidade para Pedidos */}
-        <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("all")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("cuiaba")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "cuiaba" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
-            }`}
-          >
-            Cuiabá
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedCityFilter("sao-paulo")}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-              selectedCityFilter === "sao-paulo" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-white"
-            }`}
-          >
-            São Paulo
-          </button>
+        {passwordError && (
+          <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-300">
+            {passwordError}
+          </div>
+        )}
+
+        {passwordSuccess && (
+          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+            {passwordSuccess}
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2 text-xs">
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Nova Senha Master</Label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              required
+            />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-slate-300">Confirmar Nova Senha</Label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Repita a nova senha"
+              className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              required
+            />
+          </div>
         </div>
-      </div>
 
-      {isLoading ? (
-        <p className="text-xs text-muted-foreground">Carregando pedidos...</p>
-      ) : orders.length === 0 ? (
-        <div className="rounded-2xl border border-slate-800 bg-card/40 p-8 text-center text-muted-foreground text-sm">
-          Nenhum pedido registrado para a praça selecionada.
+        <div className="flex justify-end pt-3">
+          <Button
+            type="submit"
+            disabled={isUpdatingPassword}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold gap-1.5 shadow-glow"
+          >
+            {isUpdatingPassword ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Atualizar Senha no Supabase
+          </Button>
         </div>
-      ) : (
-        <div className="space-y-3">
-          {orders.map((o: any) => {
-            const cleanPhone = (o.phone || "").replace(/\D/g, "");
-            const whatsLink = cleanPhone ? `https://wa.me/55${cleanPhone}?text=Ol%C3%A1%2C%20sobre%20seu%20pedido%20na%20Pantanal%20Smoke` : null;
-            const isSP = o.city_id === "sao-paulo" || o.address?.toLowerCase().includes("são paulo");
-
-            return (
-              <div key={o.id} className="rounded-2xl border border-slate-800 bg-card/60 p-5 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-                  <div className="flex items-center gap-2.5">
-                    {/* Badge da Cidade do Pedido */}
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold border ${
-                        isSP
-                          ? "border-cyan-500/40 bg-cyan-950/30 text-cyan-300"
-                          : "border-purple-500/40 bg-purple-950/30 text-purple-300"
-                      }`}
-                    >
-                      <MapPin className="h-3 w-3" />
-                      {isSP ? "São Paulo — SP" : "Cuiabá — MT"}
-                    </span>
-
-                    <div>
-                      <h3 className="font-bold text-white text-base">{o.customer_name || "Cliente Pantanal"}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(o.created_at).toLocaleString("pt-BR")} · Pedido #{o.id.slice(0, 8)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30">
-                      {o.status || "pendente"}
-                    </span>
-                    <span className="text-base font-bold text-emerald-400">{formatBRL(o.total || 0)}</span>
-                  </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 text-xs text-slate-300">
-                  <div>
-                    <p className="font-semibold text-white flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 text-primary" /> Endereço de Entrega:
-                    </p>
-                    <p className="mt-0.5 text-muted-foreground">{o.address || "Endereço não informado"}</p>
-                  </div>
-
-                  <div>
-                    <p className="font-semibold text-white">Contato:</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span>{o.phone}</span>
-                      {whatsLink && (
-                        <a
-                          href={whatsLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:underline"
-                        >
-                          <MessageCircle className="h-3 w-3" /> Chamar WhatsApp
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-800 pt-2 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs text-muted-foreground">
-                    Forma de pagamento: <strong className="text-slate-200 uppercase">{o.payment_method || "Online"}</strong>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleUpdateOrderStatus(o.id, "cancelado")}
-                      className="text-xs text-rose-400 border-slate-700 hover:bg-slate-800"
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleUpdateOrderStatus(o.id, "em_preparo")}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-white"
-                    >
-                      Em Preparo
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleUpdateOrderStatus(o.id, "confirmado")}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                    >
-                      <Check className="h-3.5 w-3.5 mr-1" />
-                      Confirmar Entrega (+ Cashback)
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      </form>
     </div>
-  );
-}
-
-function AdminProductThumbnail({ url, alt }: { url: string; alt: string }) {
-  const [resolved, setResolved] = useState<string | null>(url);
-
-  useEffect(() => {
-    let active = true;
-    resolveProductImage(url).then((resolvedUrl) => {
-      if (active && resolvedUrl) setResolved(resolvedUrl);
-    });
-    return () => {
-      active = false;
-    };
-  }, [url]);
-
-  return (
-    <img
-      src={resolved || url}
-      alt={alt}
-      className="h-full w-full object-contain"
-      onError={(e) => {
-        (e.target as HTMLImageElement).style.display = "none";
-      }}
-    />
   );
 }
