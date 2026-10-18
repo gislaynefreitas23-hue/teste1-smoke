@@ -61,11 +61,6 @@ export function SiteFooter() {
                 Minha conta
               </Link>
             </li>
-            <li>
-              <Link to="/admin" className="text-primary hover:underline font-semibold">
-                Painel da Loja
-              </Link>
-            </li>
           </ul>
         </div>
 

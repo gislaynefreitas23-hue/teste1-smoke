@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
+import { getStoreSettings } from "@/lib/store-settings";
 
 export const SITE_NAME = "Pantanal Smoke";
 
@@ -41,6 +42,8 @@ export type CityInventory = {
   active: boolean;
 };
 
+export type ProductBadge = "nenhum" | "lancamento" | "promocao";
+
 export type Product = {
   id: string;
   name: string;
@@ -49,10 +52,13 @@ export type Product = {
   flavor_profile: string;
   intensity: string;
   price: number;
+  promo_price?: number;
+  badge?: ProductBadge;
   image_url: string;
   stock?: number;
   city_id?: "cuiaba" | "sao-paulo";
   inventories?: Record<string, CityInventory>;
+  order?: number;
 };
 
 /** Catálogo público: só produtos ativos e disponíveis na cidade selecionada. */
@@ -166,7 +172,35 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
         }
       }
 
-      return filteredList;
+      // Aplica destaques (Lançamento / Promoção) e ordenação personalizada configurados no painel
+      const settings = getStoreSettings();
+      const productBadges = settings.productBadges || {};
+      const productPromoPrices = settings.productPromoPrices || {};
+      const productOrder = Array.isArray(settings.productOrder) ? settings.productOrder : [];
+
+      const enrichedList: Product[] = filteredList.map((p) => {
+        const badge = productBadges[p.id] || "nenhum";
+        const promoPrice = productPromoPrices[p.id];
+        return {
+          ...p,
+          badge,
+          promo_price: promoPrice && promoPrice > 0 ? promoPrice : undefined,
+        };
+      });
+
+      // Ordenação customizada: respeita a sequência de IDs definida no painel
+      if (productOrder.length > 0) {
+        enrichedList.sort((a, b) => {
+          const indexA = productOrder.indexOf(a.id);
+          const indexB = productOrder.indexOf(b.id);
+          const posA = indexA !== -1 ? indexA : 9999;
+          const posB = indexB !== -1 ? indexB : 9999;
+          if (posA !== posB) return posA - posB;
+          return a.name.localeCompare(b.name);
+        });
+      }
+
+      return enrichedList;
     },
   });
 }

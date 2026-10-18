@@ -44,6 +44,11 @@ export interface StoreSettings {
   faqTitle: string;
   faqSubtitle: string;
   faqs: FAQSettingItem[];
+
+  // Destaques e Ordenação de Produtos
+  productBadges: Record<string, "nenhum" | "lancamento" | "promocao">;
+  productPromoPrices: Record<string, number>;
+  productOrder: string[];
 }
 
 export interface FAQSettingItem {
@@ -143,6 +148,9 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       order: 3,
     },
   ],
+  productBadges: {},
+  productPromoPrices: {},
+  productOrder: [],
 };
 
 const SETTINGS_STORAGE_KEY = "pantanal_store_settings";
@@ -166,6 +174,9 @@ export function getStoreSettings(): StoreSettings {
       banners: Array.isArray(parsed.banners) && parsed.banners.length > 0
         ? parsed.banners
         : DEFAULT_STORE_SETTINGS.banners,
+      productBadges: parsed.productBadges || {},
+      productPromoPrices: parsed.productPromoPrices || {},
+      productOrder: Array.isArray(parsed.productOrder) ? parsed.productOrder : [],
     };
   } catch {
     return DEFAULT_STORE_SETTINGS;

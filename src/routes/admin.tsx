@@ -3,6 +3,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   Check,
   CheckCircle2,
@@ -30,6 +32,7 @@ import {
   Trash2,
   Truck,
   User,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -1394,6 +1397,7 @@ function BannersManagement({
 // ==========================================
 function ProductsManagement() {
   const queryClient = useQueryClient();
+  const { settings, saveSettings } = useStoreSettings();
   const [draft, setDraft] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
   const [selectedCityFilter, setSelectedCityFilter] = useState<"all" | "cuiaba" | "sao-paulo">("all");
@@ -1432,8 +1436,19 @@ function ProductsManagement() {
     },
   });
 
+  // Ordena os produtos de acordo com a prioridade salva em StoreSettings
+  const orderList = settings.productOrder || [];
+  const sortedRawProducts = [...rawProducts].sort((a: any, b: any) => {
+    const idxA = orderList.indexOf(a.id);
+    const idxB = orderList.indexOf(b.id);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return (a.name || "").localeCompare(b.name || "");
+  });
+
   // Filtra produtos de acordo com o seletor de cidade
-  const products = rawProducts.filter((p: any) => {
+  const products = sortedRawProducts.filter((p: any) => {
     if (selectedCityFilter === "all") return true;
 
     const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
@@ -1442,6 +1457,27 @@ function ProductsManagement() {
     const inv = inventories.find((i: any) => i.city_id === selectedCityFilter);
     return inv ? inv.active === true : false;
   });
+
+  // Mover produto na ordem (para cima ou para baixo)
+  async function handleMoveProduct(productId: string, direction: "up" | "down") {
+    const currentIds = sortedRawProducts.map((p: any) => p.id);
+    const currentIndex = currentIds.indexOf(productId);
+    if (currentIndex === -1) return;
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= currentIds.length) return;
+
+    const updatedIds = [...currentIds];
+    const [movedId] = updatedIds.splice(currentIndex, 1);
+    updatedIds.splice(targetIndex, 0, movedId);
+
+    await saveSettings({
+      ...settings,
+      productOrder: updatedIds,
+    });
+    queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+  }
 
   function openEditProduct(p: any) {
     const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
@@ -1459,6 +1495,11 @@ function ProductsManagement() {
       availability = "sao-paulo";
     }
 
+    const currentBadge = (settings.productBadges && settings.productBadges[p.id]) || "nenhum";
+    const currentPromoPrice = (settings.productPromoPrices && settings.productPromoPrices[p.id]) || "";
+    const orderIndex = sortedRawProducts.findIndex((item: any) => item.id === p.id);
+    const currentPos = orderIndex !== -1 ? orderIndex + 1 : sortedRawProducts.length;
+
     setDraft({
       id: p.id,
       name: p.name,
@@ -1473,6 +1514,9 @@ function ProductsManagement() {
       cuiaba_stock: cuiabaInv ? Number(cuiabaInv.stock) : 15,
       sao_paulo_price: spInv ? String(spInv.price) : String(p.price),
       sao_paulo_stock: spInv ? Number(spInv.stock) : 15,
+      badge: currentBadge,
+      promo_price: currentPromoPrice ? String(currentPromoPrice) : "",
+      order_position: String(currentPos),
     });
   }
 
@@ -1549,6 +1593,37 @@ function ProductsManagement() {
       } catch (invErr) {
         console.warn("Aviso ao sincronizar product_city_inventories:", invErr);
       }
+
+      // Atualiza badges, promo prices e ordenação em StoreSettings
+      try {
+        const updatedBadges = { ...(settings.productBadges || {}) };
+        if (draft.badge && draft.badge !== "nenhum") {
+          updatedBadges[productId] = draft.badge;
+        } else {
+          delete updatedBadges[productId];
+        }
+
+        const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
+        const numPromo = Number(String(draft.promo_price).replace(",", "."));
+        if (draft.badge === "promocao" && numPromo > 0) {
+          updatedPromoPrices[productId] = numPromo;
+        } else {
+          delete updatedPromoPrices[productId];
+        }
+
+        const allIds = sortedRawProducts.map((p: any) => p.id).filter((id: string) => id !== productId);
+        const targetPos = Math.max(1, Math.min(Number(draft.order_position) || (allIds.length + 1), allIds.length + 1));
+        allIds.splice(targetPos - 1, 0, productId);
+
+        await saveSettings({
+          ...settings,
+          productBadges: updatedBadges,
+          productPromoPrices: updatedPromoPrices,
+          productOrder: allIds,
+        });
+      } catch (stErr) {
+        console.warn("Aviso ao salvar destaques e ordenação:", stErr);
+      }
     }
 
     setBusy(false);
@@ -1560,6 +1635,21 @@ function ProductsManagement() {
   async function handleDeleteProduct(id: string, name: string) {
     if (!window.confirm(`Excluir produto "${name}"?`)) return;
     await supabase.from("products").delete().eq("id", id);
+
+    // Remove do StoreSettings também
+    const updatedBadges = { ...(settings.productBadges || {}) };
+    delete updatedBadges[id];
+    const updatedPromoPrices = { ...(settings.productPromoPrices || {}) };
+    delete updatedPromoPrices[id];
+    const updatedOrder = (settings.productOrder || []).filter((item: string) => item !== id);
+
+    await saveSettings({
+      ...settings,
+      productBadges: updatedBadges,
+      productPromoPrices: updatedPromoPrices,
+      productOrder: updatedOrder,
+    });
+
     queryClient.invalidateQueries({ queryKey: ["admin-products"] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
   }
@@ -1570,7 +1660,7 @@ function ProductsManagement() {
         <div>
           <h2 className="text-xl font-bold text-white">Catálogo de Produtos Multicidade</h2>
           <p className="text-xs text-muted-foreground">
-            Gerencie preços, estoques e disponibilidades independentes para Cuiabá e São Paulo.
+            Gerencie preços, estoques, destaques (Lançamento ou Promoção) e reordene os produtos na ordem que preferir.
           </p>
         </div>
 
@@ -1589,6 +1679,9 @@ function ProductsManagement() {
               cuiaba_stock: 15,
               sao_paulo_price: "49.90",
               sao_paulo_stock: 15,
+              badge: "nenhum",
+              promo_price: "",
+              order_position: String(rawProducts.length + 1),
             })
           }
           className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs gap-1.5 shadow-glow"
@@ -1599,41 +1692,47 @@ function ProductsManagement() {
       </div>
 
       {/* Seletor / Filtro de Cidade do Painel */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-4">
-        <span className="text-xs font-semibold text-muted-foreground mr-1">Filtrar por praça:</span>
-        <button
-          type="button"
-          onClick={() => setSelectedCityFilter("all")}
-          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-            selectedCityFilter === "all"
-              ? "bg-primary text-primary-foreground shadow-glow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          Todos os produtos ({rawProducts.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedCityFilter("cuiaba")}
-          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-            selectedCityFilter === "cuiaba"
-              ? "bg-primary text-primary-foreground shadow-glow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          📍 Cuiabá — MT
-        </button>
-        <button
-          type="button"
-          onClick={() => setSelectedCityFilter("sao-paulo")}
-          className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-            selectedCityFilter === "sao-paulo"
-              ? "bg-primary text-primary-foreground shadow-glow"
-              : "bg-slate-900 text-slate-300 hover:bg-slate-800"
-          }`}
-        >
-          📍 São Paulo — SP
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-muted-foreground mr-1">Filtrar por praça:</span>
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("all")}
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "all"
+                ? "bg-primary text-primary-foreground shadow-glow"
+                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+            }`}
+          >
+            Todos os produtos ({rawProducts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("cuiaba")}
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "cuiaba"
+                ? "bg-primary text-primary-foreground shadow-glow"
+                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+            }`}
+          >
+            📍 Cuiabá — MT
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedCityFilter("sao-paulo")}
+            className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+              selectedCityFilter === "sao-paulo"
+                ? "bg-primary text-primary-foreground shadow-glow"
+                : "bg-slate-900 text-slate-300 hover:bg-slate-800"
+            }`}
+          >
+            📍 São Paulo — SP
+          </button>
+        </div>
+
+        <div className="text-[11px] text-muted-foreground">
+          Use os botões <strong className="text-primary">↑</strong> e <strong className="text-primary">↓</strong> em cada card para definir a ordem exata do catálogo.
+        </div>
       </div>
 
       {/* Formulário de Cadastro / Edição com Preços e Estoques Independentes */}
@@ -1642,7 +1741,7 @@ function ProductsManagement() {
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              {draft.id ? "Editar Produto & Inventário por Cidade" : "Cadastrar Novo Produto Multicidade"}
+              {draft.id ? "Editar Produto, Destaque & Ordem" : "Cadastrar Novo Produto Multicidade"}
             </h3>
             {draft.id && <span className="text-[11px] font-mono text-muted-foreground">{draft.id}</span>}
           </div>
@@ -1689,18 +1788,106 @@ function ProductsManagement() {
                 value={draft.image_url}
                 onChange={(url) => setDraft({ ...draft, image_url: url })}
                 folderPrefix="produto"
-                helperText="Selecione a foto do produto salva no computador (PNG, JPG, WEBP, GIF)."
+                helperText="Selecione a foto do produto salva no computador (PNG, JPG, WEBP, GIF). O cliente poderá clicar para vê-la ampliada."
               />
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">Descrição do Produto</Label>
-              <Input
+              <Label className="text-xs font-semibold">Descrição Completa do Produto</Label>
+              <Textarea
+                rows={3}
                 value={draft.description}
                 onChange={(e) => setDraft({ ...draft, description: e.target.value })}
-                placeholder="Detalhes e características do produto..."
-                className="mt-1 text-sm"
+                placeholder="Detalhes, especificações e diferenciais do produto (exibidos no modal de detalhes ao cliente clicar)..."
+                className="mt-1 text-xs"
               />
+            </div>
+          </div>
+
+          {/* DESTAQUE E ORDENAÇÃO DO PRODUTO */}
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-4">
+            <div>
+              <Label className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Destaque do Produto no Catálogo (Lançamento ou Promoção)
+              </Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Escolha se este produto terá selo de destaque visual na vitrine e na página de detalhes.
+              </p>
+
+              <div className="mt-2.5 grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, badge: "nenhum" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.badge === "nenhum" || !draft.badge
+                      ? "border-primary bg-primary/20 text-primary shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Sem Destaque
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, badge: "lancamento" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.badge === "lancamento"
+                      ? "border-purple-400 bg-purple-500/25 text-purple-200 shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  ⭐ Lançamento
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraft({ ...draft, badge: "promocao" })}
+                  className={`rounded-xl border p-2.5 text-xs font-semibold transition-all cursor-pointer ${
+                    draft.badge === "promocao"
+                      ? "border-amber-400 bg-amber-500/25 text-amber-200 shadow-glow"
+                      : "border-slate-800 bg-slate-900/60 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  🔥 Promoção
+                </button>
+              </div>
+            </div>
+
+            {/* Preço promocional e Posição na Ordem */}
+            <div className="grid gap-4 sm:grid-cols-2 pt-2 border-t border-slate-800/80">
+              {draft.badge === "promocao" && (
+                <div>
+                  <Label className="text-[11px] font-semibold text-amber-300">
+                    Preço Promocional Promocional de Destaque (R$)
+                  </Label>
+                  <Input
+                    value={draft.promo_price}
+                    onChange={(e) => setDraft({ ...draft, promo_price: e.target.value })}
+                    placeholder="Ex: 79.90"
+                    className="mt-1 text-xs font-bold border-amber-500/40 focus:border-amber-400"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    O preço original aparecerá riscado e o novo preço com destaque promocional.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-[11px] font-semibold text-slate-300">
+                  Posição de Exibição no Catálogo (# Ordem)
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={rawProducts.length + 1}
+                  value={draft.order_position}
+                  onChange={(e) => setDraft({ ...draft, order_position: e.target.value })}
+                  placeholder="1"
+                  className="mt-1 text-xs font-bold"
+                />
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  1 = primeiro produto da lista. O cliente verá os produtos nessa ordem exata.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -1844,7 +2031,7 @@ function ProductsManagement() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={busy} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-glow text-xs">
-                {busy ? "Salvando..." : "Salvar Produto & Cidades"}
+                {busy ? "Salvando..." : "Salvar Produto & Configurações"}
               </Button>
             </div>
           </div>
@@ -1860,7 +2047,7 @@ function ProductsManagement() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((p: any) => {
+          {products.map((p: any, index: number) => {
             const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
             const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
             const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
@@ -1873,9 +2060,40 @@ function ProductsManagement() {
             const spPrice = spInv ? Number(spInv.price) : Number(p.price);
             const spStock = spInv ? Number(spInv.stock) : 15;
 
+            const badge = (settings.productBadges && settings.productBadges[p.id]) || "nenhum";
+            const promoPrice = (settings.productPromoPrices && settings.productPromoPrices[p.id]) || null;
+            const isFirst = index === 0;
+            const isLast = index === products.length - 1;
+
             return (
               <div key={p.id} className="rounded-2xl border border-slate-800 bg-card/60 p-4 flex flex-col justify-between hover:border-primary/50 transition-colors">
                 <div>
+                  {/* Topo do Card com Posição, Badge e Status */}
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80">
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex h-5 w-6 items-center justify-center rounded-md bg-primary/20 text-[10px] font-mono font-bold text-primary">
+                        #{index + 1}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {badge === "lancamento" && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          ⭐ LANÇAMENTO
+                        </span>
+                      )}
+                      {badge === "promocao" && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          🔥 PROMOÇÃO
+                        </span>
+                      )}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+                        {p.active ? "Ativo" : "Pausado"}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="flex gap-3">
                     {p.image_url ? (
                       <div className="h-14 w-14 rounded-xl border border-slate-800 bg-slate-950 p-1 shrink-0 flex items-center justify-center overflow-hidden">
@@ -1883,16 +2101,14 @@ function ProductsManagement() {
                       </div>
                     ) : null}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">{p.category}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${p.active ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
-                          {p.active ? "Ativo no Site" : "Pausado"}
-                        </span>
-                      </div>
-
-                      <h4 className="mt-1 font-bold text-white text-sm truncate">{p.name}</h4>
+                      <h4 className="font-bold text-white text-sm truncate">{p.name}</h4>
                       {p.flavor_profile && (
                         <p className="text-[11px] text-muted-foreground mt-0.5 truncate">Sabor: {p.flavor_profile}</p>
+                      )}
+                      {promoPrice && (
+                        <p className="text-[11px] font-bold text-amber-400 mt-0.5">
+                          Preço Promo: {formatBRL(promoPrice)}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -1929,14 +2145,40 @@ function ProductsManagement() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-end gap-1.5 border-t border-slate-800 pt-2">
-                  <Button size="sm" variant="ghost" onClick={() => openEditProduct(p)} className="text-xs gap-1">
-                    <Edit2 className="h-3.5 w-3.5 text-primary" />
-                    Editar
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(p.id, p.name)} className="text-xs text-destructive hover:text-destructive">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+                {/* Ações: Reordenação (↑ / ↓) + Editar / Excluir */}
+                <div className="mt-3 flex items-center justify-between border-t border-slate-800 pt-2">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isFirst}
+                      onClick={() => handleMoveProduct(p.id, "up")}
+                      title="Mover produto para cima"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-primary hover:bg-slate-800 disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isLast}
+                      onClick={() => handleMoveProduct(p.id, "down")}
+                      title="Mover produto para baixo"
+                      className="h-7 w-7 p-0 text-slate-400 hover:text-primary hover:bg-slate-800 disabled:opacity-30"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => openEditProduct(p)} className="h-7 px-2 text-xs gap-1">
+                      <Edit2 className="h-3.5 w-3.5 text-primary" />
+                      Editar
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(p.id, p.name)} className="h-7 px-2 text-xs text-destructive hover:text-destructive">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             );

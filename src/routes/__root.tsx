@@ -138,6 +138,45 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Remove permanentemente qualquer botão, selo ou elemento do Lovable que possa ser injetado no DOM
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const purgeLovableElements = () => {
+      const selectors = [
+        "#lovable-badge",
+        "[id*='lovable-badge']",
+        "[id*='lovable']",
+        "[data-lovable-badge]",
+        ".lovable-badge",
+        "[class*='lovable-badge']",
+        "a[href*='lovable.dev']",
+        "a[href*='lovable.app']",
+      ];
+      selectors.forEach((selector) => {
+        try {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach((el) => {
+            el.remove();
+          });
+        } catch {
+          // ignore
+        }
+      });
+    };
+
+    purgeLovableElements();
+    if (typeof MutationObserver !== "undefined") {
+      const observer = new MutationObserver(purgeLovableElements);
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+
+      return () => observer.disconnect();
+    }
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
