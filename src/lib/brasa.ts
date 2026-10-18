@@ -46,6 +46,7 @@ export type ProductBadge = "nenhum" | "lancamento" | "promocao";
 
 export type Product = {
   id: string;
+  active?: boolean;
   name: string;
   category: string;
   description: string;

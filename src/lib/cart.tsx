@@ -1,3 +1,4 @@
+import type React from "react";
 import {
   createContext,
   useCallback,
@@ -17,9 +18,9 @@ export type CartItem = {
   name: string;
   price: number;
   qty: number;
-  cityId?: "cuiaba" | "sao-paulo";
-  stock?: number;
-  imageUrl?: string;
+  cityId?: "cuiaba" | "sao-paulo" | undefined;
+  stock?: number | undefined;
+  imageUrl?: string | undefined;
 };
 
 export type CartContextValue = {
@@ -29,9 +30,9 @@ export type CartContextValue = {
       id: string;
       name: string;
       price: number;
-      cityId?: "cuiaba" | "sao-paulo";
-      stock?: number;
-      imageUrl?: string;
+      cityId?: "cuiaba" | "sao-paulo" | undefined;
+      stock?: number | undefined;
+      imageUrl?: string | undefined;
     },
     quantity?: number,
   ) => boolean;
@@ -48,7 +49,14 @@ export type CartContextValue = {
   dismissNotification: () => void;
 };
 
-export const CartContext = createContext<CartContextValue | null>(null);
+// Mantém o mesmo contexto entre recarregamentos do módulo (HMR), evitando que
+// o Provider e os consumidores fiquem com instâncias diferentes.
+const globalForCart = globalThis as unknown as {
+  __pantanalCartContext?: React.Context<CartContextValue | null>;
+};
+export const CartContext =
+  globalForCart.__pantanalCartContext ??
+  (globalForCart.__pantanalCartContext = createContext<CartContextValue | null>(null));
 
 const CART_EVENT_NAME = "pantanal_cart_updated";
 
@@ -174,9 +182,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         id: string;
         name: string;
         price: number;
-        cityId?: "cuiaba" | "sao-paulo";
-        stock?: number;
-        imageUrl?: string;
+        cityId?: "cuiaba" | "sao-paulo" | undefined;
+        stock?: number | undefined;
+        imageUrl?: string | undefined;
       },
       quantity: number = 1,
     ): boolean => {
@@ -321,12 +329,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const noop = () => {};
+const FALLBACK_CART: CartContextValue = {
+  items: [], add: () => false, setQty: noop, remove: noop, clear: noop,
+  count: 0, subtotal: 0, cartCityId: null, cityConflictWarning: null,
+  dismissCityConflictWarning: noop, lastAddedProduct: null,
+  isNotificationVisible: false, dismissNotification: noop,
+};
+
 export function useSafeCart() {
   return useContext(CartContext);
 }
 
 export function useCart() {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart precisa estar dentro de CartProvider");
-  return ctx;
+  // Fallback seguro: nunca derruba a página se o Provider não estiver disponível
+  // (ex.: durante recarregamento do módulo).
+  return ctx ?? FALLBACK_CART;
 }
