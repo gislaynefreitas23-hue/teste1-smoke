@@ -123,7 +123,13 @@ const SLIDES: SlideItem[] = [
   },
 ];
 
-export function ProductBannerCarousel() {
+export function ProductBannerCarousel({
+  compact = false,
+  className = "",
+}: {
+  compact?: boolean;
+  className?: string;
+} = {}) {
   const { settings } = useStoreSettings();
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
@@ -213,7 +219,11 @@ export function ProductBannerCarousel() {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="group relative my-6 w-full overflow-hidden rounded-3xl border border-[#34313B]/30 shadow-[0_20px_45px_rgba(52,49,59,0.18)] transition-all duration-300"
+      className={`group relative w-full overflow-hidden rounded-2xl sm:rounded-3xl border border-[#34313B]/30 transition-all duration-300 ${
+        compact
+          ? "my-3 sm:my-4 shadow-[0_10px_25px_rgba(52,49,59,0.12)]"
+          : "my-6 shadow-[0_20px_45px_rgba(52,49,59,0.18)]"
+      } ${className}`}
       style={{
         background:
           "radial-gradient(110% 90% at 50% 45%, #E9E0D6 0%, #E4E1E5 38%, #D5D3D8 68%, #C9C0C1 86%, #34313B 100%)",
@@ -221,7 +231,9 @@ export function ProductBannerCarousel() {
     >
       {/* Camadas visuais de fumaça roxa contínua integradas com transparência difusa */}
       <div
-        className="animate-smoke-1 pointer-events-none absolute -left-20 -top-24 h-96 w-96 rounded-full blur-3xl"
+        className={`animate-smoke-1 pointer-events-none absolute rounded-full blur-3xl ${
+          compact ? "h-60 w-60 -left-16 -top-20" : "h-96 w-96 -left-20 -top-24"
+        }`}
         style={{
           background:
             "radial-gradient(circle, rgba(168, 85, 247, 0.32) 0%, rgba(147, 51, 234, 0.12) 50%, transparent 75%)",
@@ -229,7 +241,9 @@ export function ProductBannerCarousel() {
         aria-hidden="true"
       />
       <div
-        className="animate-smoke-2 pointer-events-none absolute -right-20 -bottom-20 h-[26rem] w-[26rem] rounded-full blur-3xl"
+        className={`animate-smoke-2 pointer-events-none absolute rounded-full blur-3xl ${
+          compact ? "h-60 w-60 -right-16 -bottom-16" : "h-[26rem] w-[26rem] -right-20 -bottom-20"
+        }`}
         style={{
           background:
             "radial-gradient(circle, rgba(192, 132, 252, 0.28) 0%, rgba(168, 85, 247, 0.14) 55%, transparent 80%)",
@@ -237,7 +251,9 @@ export function ProductBannerCarousel() {
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute left-1/2 top-1/3 h-80 w-80 -translate-x-1/2 rounded-full blur-2xl opacity-20"
+        className={`pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 rounded-full blur-2xl opacity-20 ${
+          compact ? "h-48 w-48" : "h-80 w-80"
+        }`}
         style={{
           background: "radial-gradient(circle, #A855F7 0%, transparent 70%)",
         }}
@@ -265,27 +281,61 @@ export function ProductBannerCarousel() {
                 aria-roledescription="slide"
                 aria-label={`Slide ${index + 1} de ${totalSlides}: ${slide.name}`}
                 aria-hidden={!isSlideActive}
-                className="w-full shrink-0 px-6 py-7 sm:px-12 sm:py-8 md:px-14 md:py-10"
+                className={`w-full shrink-0 ${
+                  compact
+                    ? "px-4 py-3 sm:px-6 sm:py-3.5 md:px-8 md:py-4"
+                    : "px-6 py-7 sm:px-12 sm:py-8 md:px-14 md:py-10"
+                }`}
               >
-                <div className="grid grid-cols-1 items-center gap-6 sm:gap-8 md:min-h-[370px] md:grid-cols-12">
+                <div
+                  className={`grid grid-cols-1 items-center gap-3 sm:gap-6 md:grid-cols-12 ${
+                    compact
+                      ? "min-h-[140px] sm:min-h-[160px] md:min-h-[175px]"
+                      : "md:min-h-[370px]"
+                  }`}
+                >
                   {/* Coluna 1: Informações e Destaques */}
-                  <div className="flex flex-col justify-center space-y-4 md:col-span-7 lg:col-span-8">
+                  <div
+                    className={`flex flex-col justify-center ${
+                      compact
+                        ? "space-y-1.5 sm:space-y-2 md:col-span-8"
+                        : "space-y-4 md:col-span-7 lg:col-span-8"
+                    }`}
+                  >
                     {/* Linha Superior: Selo LANÇAMENTO + Badges */}
-                    <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       {/* Selo LANÇAMENTO destacado em roxo neon com brilho elegante */}
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/40 bg-[#A855F7] px-3.5 py-1 text-[11px] font-black tracking-[0.25em] uppercase text-white shadow-[0_0_16px_rgba(168,85,247,0.5)] sm:text-xs">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-[#A855F7] font-black uppercase text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] ${
+                          compact
+                            ? "px-2 py-0.5 text-[9px] sm:text-[10px] tracking-[0.15em]"
+                            : "px-3.5 py-1 text-[11px] sm:text-xs tracking-[0.25em]"
+                        }`}
+                      >
                         <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
                         LANÇAMENTO
                       </span>
 
                       {/* Identificação 40.000 PUFFS */}
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-600/40 bg-[#25222B] px-3.5 py-1 text-xs font-bold tracking-wider text-purple-200 shadow-sm backdrop-blur-sm">
-                        <Zap className="h-3.5 w-3.5 text-purple-400" />
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border border-purple-600/40 bg-[#25222B] font-bold text-purple-200 shadow-sm backdrop-blur-sm ${
+                          compact
+                            ? "px-2 py-0.5 text-[10px] sm:text-[11px] tracking-wide"
+                            : "px-3.5 py-1 text-xs tracking-wider"
+                        }`}
+                      >
+                        <Zap className={compact ? "h-3 w-3 text-purple-400" : "h-3.5 w-3.5 text-purple-400"} />
                         {slide.puffs}
                       </span>
 
                       {/* Tag de Tecnologia Turbo */}
-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-400/40 bg-slate-900/10 px-3 py-1 text-[11px] font-semibold tracking-wide text-[#34313B]">
+                      <span
+                        className={`items-center gap-1 rounded-full border border-slate-400/40 bg-slate-900/10 font-semibold tracking-wide text-[#34313B] ${
+                          compact
+                            ? "hidden sm:inline-flex px-2 py-0.5 text-[10px]"
+                            : "inline-flex px-3 py-1 text-[11px]"
+                        }`}
+                      >
                         <Gauge className="h-3 w-3 text-slate-600" />
                         {slide.subtitle}
                       </span>
@@ -293,50 +343,84 @@ export function ProductBannerCarousel() {
 
                     {/* Nome do Produto com Tipografia Escura Forte sobre fundo luminoso */}
                     <div>
-                      <h2 className="text-3xl font-black tracking-tight text-[#221F28] sm:text-4xl md:text-5xl">
+                      <h2
+                        className={`font-black tracking-tight text-[#221F28] ${
+                          compact
+                            ? "text-xl sm:text-2xl md:text-3xl leading-tight"
+                            : "text-3xl sm:text-4xl md:text-5xl"
+                        }`}
+                      >
                         {slide.name}
                       </h2>
-                      <p className="mt-2.5 max-w-xl text-xs font-medium leading-relaxed text-[#4A4652] sm:text-sm md:text-base">
+                      <p
+                        className={`font-medium text-[#4A4652] ${
+                          compact
+                            ? "mt-0.5 max-w-lg text-[11px] sm:text-xs line-clamp-1 sm:line-clamp-2 leading-snug"
+                            : "mt-2.5 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed"
+                        }`}
+                      >
                         {slide.flavorDesc}
                       </p>
                     </div>
 
                     {/* Recursos e Performance */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-medium text-[#423E4B] sm:text-xs">
-                      {slide.features.map((feature, fIdx) => (
-                        <div key={feature} className="flex items-center gap-1.5">
-                          {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
-                          <span className="flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#A855F7] shadow-[0_0_6px_rgba(168,85,247,0.9)]" />
-                            {feature}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    {!compact ? (
+                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-medium text-[#423E4B] sm:text-xs">
+                        {slide.features.map((feature, fIdx) => (
+                          <div key={feature} className="flex items-center gap-1.5">
+                            {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
+                            <span className="flex items-center gap-1">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#A855F7] shadow-[0_0_6px_rgba(168,85,247,0.9)]" />
+                              {feature}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="hidden sm:flex flex-wrap items-center gap-2 pt-0.5 text-[10px] font-medium text-[#423E4B]">
+                        {slide.features.slice(0, 2).map((feature, fIdx) => (
+                          <div key={feature} className="flex items-center gap-1">
+                            {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
+                            <span className="h-1 w-1 rounded-full bg-[#A855F7]" />
+                            <span>{feature}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Botão de ação direta para o produto */}
-                    <div className="pt-2 flex items-center gap-3">
+                    <div className={compact ? "pt-1 flex items-center gap-2" : "pt-2 flex items-center gap-3"}>
                       <a
                         href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
-                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] px-4 py-2 text-xs font-bold text-white shadow-[0_4px_14px_rgba(168,85,247,0.35)] transition-all hover:scale-105 hover:shadow-[0_6px_20px_rgba(168,85,247,0.55)] cursor-pointer"
+                        className={`inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,85,247,0.5)] cursor-pointer ${
+                          compact
+                            ? "px-3 py-1 text-[11px]"
+                            : "px-4 py-2 text-xs"
+                        }`}
                       >
-                        <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                        <Sparkles className="h-3 w-3 text-amber-300" />
                         Ver Detalhes & Pedir
-                        <ArrowRight className="h-3.5 w-3.5" />
+                        <ArrowRight className="h-3 w-3" />
                       </a>
                     </div>
                   </div>
 
                   {/* Coluna 2: Produto com Fumaça Roxa Integrada (Sem Caixa Branca) */}
-                  <div className="flex items-center justify-center md:col-span-5 lg:col-span-4">
+                  <div className={`flex items-center justify-center ${compact ? "md:col-span-4" : "md:col-span-5 lg:col-span-4"}`}>
                     <a
                       href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
-                      className="group/img relative flex h-64 w-full max-w-[260px] items-center justify-center sm:h-72 sm:max-w-[280px] md:h-84 cursor-pointer"
+                      className={`group/img relative flex w-full items-center justify-center cursor-pointer ${
+                        compact
+                          ? "h-28 sm:h-36 md:h-40 max-w-[120px] sm:max-w-[160px]"
+                          : "h-64 sm:h-72 sm:max-w-[280px] md:h-84 max-w-[260px]"
+                      }`}
                       aria-label={`Ver detalhes de ${slide.name}`}
                     >
                       {/* Iluminação difusa roxa projetada atrás da imagem original do produto */}
                       <div
-                        className="pointer-events-none absolute inset-0 -m-6 rounded-full opacity-40 blur-2xl transition-all duration-500 group-hover/img:opacity-65"
+                        className={`pointer-events-none absolute inset-0 rounded-full opacity-40 transition-all duration-500 group-hover/img:opacity-65 ${
+                          compact ? "-m-3 blur-xl" : "-m-6 blur-2xl"
+                        }`}
                         style={{ background: slide.glowColor }}
                         aria-hidden="true"
                       />
@@ -361,30 +445,40 @@ export function ProductBannerCarousel() {
         type="button"
         onClick={prevSlide}
         aria-label="Slide anterior"
-        className="absolute left-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#C9C0C1] bg-white/80 text-[#34313B] shadow-md backdrop-blur-md transition-all duration-200 hover:border-[#A855F7] hover:bg-[#A855F7] hover:text-white hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] cursor-pointer sm:left-3 sm:h-10 sm:w-10"
+        className={`absolute left-2 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center rounded-full border border-[#C9C0C1] bg-white/80 text-[#34313B] shadow-md backdrop-blur-md transition-all duration-200 hover:border-[#A855F7] hover:bg-[#A855F7] hover:text-white hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] cursor-pointer ${
+          compact ? "h-7 w-7 sm:h-8 sm:w-8" : "h-9 w-9 sm:h-10 sm:w-10 sm:left-3"
+        }`}
       >
-        <ChevronLeft className="h-5 w-5" />
+        <ChevronLeft className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </button>
 
       <button
         type="button"
         onClick={nextSlide}
         aria-label="Próximo slide"
-        className="absolute right-2 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-[#C9C0C1] bg-white/80 text-[#34313B] shadow-md backdrop-blur-md transition-all duration-200 hover:border-[#A855F7] hover:bg-[#A855F7] hover:text-white hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] cursor-pointer sm:right-3 sm:h-10 sm:w-10"
+        className={`absolute right-2 top-1/2 z-20 flex -translate-y-1/2 items-center justify-center rounded-full border border-[#C9C0C1] bg-white/80 text-[#34313B] shadow-md backdrop-blur-md transition-all duration-200 hover:border-[#A855F7] hover:bg-[#A855F7] hover:text-white hover:shadow-[0_0_15px_rgba(168,85,247,0.5)] cursor-pointer ${
+          compact ? "h-7 w-7 sm:h-8 sm:w-8" : "h-9 w-9 sm:h-10 sm:w-10 sm:right-3"
+        }`}
       >
-        <ChevronRight className="h-5 w-5" />
+        <ChevronRight className={compact ? "h-4 w-4" : "h-5 w-5"} />
       </button>
 
       {/* Faixa inferior (Rodapé do Banner): base sólida em grafite com frase sincronizada + indicadores */}
-      <div className="relative z-20 flex flex-col items-center justify-between gap-3 border-t border-[#34313B]/30 bg-[#25222B]/95 px-6 py-3.5 backdrop-blur-md sm:flex-row">
+      <div
+        className={`relative z-20 flex flex-col items-center justify-between border-t border-[#34313B]/30 bg-[#25222B]/95 backdrop-blur-md sm:flex-row ${
+          compact ? "px-4 py-2 gap-2" : "px-6 py-3.5 gap-3"
+        }`}
+      >
         {/* Frase sincronizada exclusivamente com o slide ativo */}
         <div className="flex items-center gap-2 text-center sm:text-left">
-          <Sparkles className="h-4 w-4 shrink-0 text-[#A855F7] drop-shadow-[0_0_6px_rgba(168,85,247,0.8)]" aria-hidden="true" />
-          <div className="relative h-5 overflow-hidden sm:h-6 flex items-center">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 text-[#A855F7] drop-shadow-[0_0_6px_rgba(168,85,247,0.8)]" aria-hidden="true" />
+          <div className={`relative overflow-hidden flex items-center ${compact ? "h-4 sm:h-5" : "h-5 sm:h-6"}`}>
             {slides.map((slide, idx) => (
               <span
                 key={slide.id}
-                className={`transition-all duration-500 text-xs sm:text-sm font-semibold tracking-wide text-slate-100 ${
+                className={`transition-all duration-500 font-semibold tracking-wide text-slate-100 ${
+                  compact ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"
+                } ${
                   idx === current
                     ? "block opacity-100 translate-y-0"
                     : "hidden opacity-0 -translate-y-2"
@@ -397,7 +491,7 @@ export function ProductBannerCarousel() {
         </div>
 
         {/* Indicadores de posição (Dots com destaque roxo neon e contador) */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Navegação dos slides">
             {slides.map((slide, idx) => {
               const isActive = idx === current;
@@ -409,9 +503,15 @@ export function ProductBannerCarousel() {
                   aria-selected={isActive}
                   aria-label={`Ir para o slide ${idx + 1}: ${slide.name}`}
                   onClick={() => setCurrent(idx)}
-                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  className={`rounded-full transition-all duration-300 cursor-pointer ${
+                    compact ? "h-1.5" : "h-2"
+                  } ${
                     isActive
-                      ? "w-7 bg-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.9)]"
+                      ? compact
+                        ? "w-5 bg-[#A855F7] shadow-[0_0_10px_rgba(168,85,247,0.9)]"
+                        : "w-7 bg-[#A855F7] shadow-[0_0_12px_rgba(168,85,247,0.9)]"
+                      : compact
+                      ? "w-1.5 bg-slate-500/60 hover:bg-slate-300"
                       : "w-2 bg-slate-500/60 hover:bg-slate-300"
                   }`}
                 />
@@ -419,7 +519,7 @@ export function ProductBannerCarousel() {
             })}
           </div>
 
-          <span className="text-xs font-mono font-medium text-slate-300">
+          <span className={`font-mono font-medium text-slate-300 ${compact ? "text-[10px]" : "text-xs"}`}>
             0{current + 1} / 0{totalSlides}
           </span>
         </div>

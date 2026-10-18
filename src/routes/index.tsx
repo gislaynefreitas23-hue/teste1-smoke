@@ -37,22 +37,22 @@ function Home() {
   return (
     <main className="mx-auto max-w-6xl px-4">
       {/* Apresentação Principal da Marca / Hero */}
-      <section className="pt-8 pb-4 text-center sm:py-16">
+      <section className="pt-6 pb-2 text-center sm:pt-10 sm:pb-4">
         <img
           src={brandImage}
           alt="Pantanal Smoke"
           width={1536}
           height={512}
-          className="mx-auto w-full max-w-2xl object-contain"
+          className="mx-auto w-full max-w-lg object-contain"
         />
-        <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl">
+        <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
           Conecte-se à sua <span className="text-ember">vibe</span>.
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-xl text-sm sm:text-base text-muted-foreground">
           {settings.homeHighlightPhrase || "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."}
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3 sm:mt-8">
-          <Button size="lg" className="bg-ember px-8 shadow-glow" asChild>
+        <div className="mt-4 flex flex-wrap justify-center gap-2.5 sm:mt-6 sm:gap-3">
+          <Button size="default" className="bg-ember px-6 sm:px-8 shadow-glow" asChild>
             <Link
               to="/produtos"
               onClick={(e) => requireCityOrNavigate("/produtos", e)}
@@ -60,7 +60,7 @@ function Home() {
               Ver produtos
             </Link>
           </Button>
-          <Button size="lg" variant="outline" className="px-8" asChild>
+          <Button size="default" variant="outline" className="px-6 sm:px-8" asChild>
             <Link
               to="/recomendar"
               onClick={(e) => requireCityOrNavigate("/recomendar", e)}
@@ -71,8 +71,8 @@ function Home() {
         </div>
       </section>
 
-      {/* Carrossel de Banners com Destaques e Lançamentos */}
-      <ProductBannerCarousel />
+      {/* Carrossel de Banners com Destaques e Lançamentos - Versão compacta para não roubar espaço da seleção de cidade */}
+      <ProductBannerCarousel compact={true} />
 
       {/* Seção de Seleção de Cidade na entrada da loja */}
       <CitySection />
