@@ -10,18 +10,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, resolveProductImage, type Product } from "@/lib/brasa";
+import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 import { useCart } from "@/lib/cart";
 
 interface ProductDetailModalProps {
   product: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  cityId?: string;
 }
 
 export function ProductDetailModal({
   product,
   open,
   onOpenChange,
+  cityId,
 }: ProductDetailModalProps) {
   const { add } = useCart();
   const [quantity, setQuantity] = useState(1);
@@ -32,9 +35,22 @@ export function ProductDetailModal({
     if (product) {
       setQuantity(1);
       let active = true;
+      const fastAsset = getTransparentPodAsset(product.id, product.image_url, product.name);
+      if (fastAsset) {
+        setResolvedImage(fastAsset);
+        return;
+      }
+
       if (product.image_url) {
-        resolveProductImage(product.image_url).then((url) => {
-          if (active) setResolvedImage(url);
+        resolveProductImage(product.image_url).then(async (url) => {
+          if (active && url) {
+            try {
+              const clean = await removeWhiteBackgroundClientSide(url);
+              if (active) setResolvedImage(clean);
+            } catch {
+              if (active) setResolvedImage(url);
+            }
+          }
         });
       } else {
         setResolvedImage(null);
@@ -78,6 +94,13 @@ export function ProductDetailModal({
           <div className="grid gap-6 sm:grid-cols-2">
             {/* Coluna da Imagem Ampliada */}
             <div className="relative flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/70 p-4 min-h-[260px] sm:min-h-[360px] overflow-hidden">
+              {/* Brilho neon difuso roxo de fundo integrado */}
+              <div
+                className="pointer-events-none absolute inset-0 -m-6 rounded-full opacity-35 blur-2xl"
+                style={{ background: "rgba(168, 85, 247, 0.25)" }}
+                aria-hidden="true"
+              />
+
               {/* Badges de Lançamento / Promoção sobre a imagem */}
               <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
                 {product.badge === "lancamento" && (
@@ -106,7 +129,7 @@ export function ProductDetailModal({
                 <img
                   src={resolvedImage}
                   alt={product.name}
-                  className="max-h-[280px] sm:max-h-[340px] w-full object-contain transition-transform duration-300 hover:scale-105"
+                  className="relative z-10 max-h-[280px] sm:max-h-[340px] w-full object-contain drop-shadow-[0_14px_28px_rgba(0,0,0,0.55)] transition-transform duration-300 hover:scale-105"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=600&auto=format&fit=crop&q=80";

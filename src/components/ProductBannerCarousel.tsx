@@ -7,6 +7,8 @@ import imgToastedPineapple from "@/assets/banner-toasted-pineapple.png";
 import { resolveProductImage } from "@/lib/brasa";
 import { useStoreSettings } from "@/lib/store-settings";
 
+import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
+
 const POD_PRODUCT_IDS: Record<string, string> = {
   "Aurora Berries": "055e851d-e131-41c4-bbb5-6e358c2e719b",
   "Pink Lemonade": "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
@@ -21,32 +23,49 @@ function CarouselSlideImage({
   imageUrl,
   alt,
   isEager,
+  productId,
+  productName,
 }: {
   imageUrl: string;
   alt: string;
   isEager: boolean;
+  productId?: string;
+  productName?: string;
 }) {
-  const [resolvedUrl, setResolvedUrl] = useState<string>(imageUrl);
+  const [resolvedUrl, setResolvedUrl] = useState<string>(() => {
+    return getTransparentPodAsset(productId, imageUrl, productName || alt) || imageUrl;
+  });
 
   useEffect(() => {
     let active = true;
+    const fastAsset = getTransparentPodAsset(productId, imageUrl, productName || alt);
+    if (fastAsset) {
+      setResolvedUrl(fastAsset);
+      return;
+    }
+
     if (imageUrl) {
-      resolveProductImage(imageUrl).then((url) => {
+      resolveProductImage(imageUrl).then(async (url) => {
         if (active && url) {
-          setResolvedUrl(url);
+          try {
+            const clean = await removeWhiteBackgroundClientSide(url);
+            if (active) setResolvedUrl(clean);
+          } catch {
+            if (active) setResolvedUrl(url);
+          }
         }
       });
     }
     return () => {
       active = false;
     };
-  }, [imageUrl]);
+  }, [imageUrl, productId, productName, alt]);
 
   return (
     <img
       src={resolvedUrl}
       alt={alt}
-      className="relative z-10 h-full w-full object-contain drop-shadow-[0_14px_28px_rgba(52,49,59,0.22)] transition-transform duration-500 hover:scale-105"
+      className="relative z-10 h-full w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.55)] transition-transform duration-500 hover:scale-105"
       loading={isEager ? "eager" : "lazy"}
     />
   );
@@ -325,6 +344,8 @@ export function ProductBannerCarousel() {
                         imageUrl={slide.image}
                         alt={`${slide.name} — ${slide.puffs}`}
                         isEager={index === 0}
+                        productId={slide.productId}
+                        productName={slide.name}
                       />
                     </a>
                   </div>

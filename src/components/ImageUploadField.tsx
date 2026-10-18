@@ -8,6 +8,7 @@ import {
   Link2,
   RefreshCw,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { resolveProductImage } from "@/lib/brasa";
+import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 
 interface ImageUploadFieldProps {
   value: string;
@@ -49,17 +51,26 @@ export function ImageUploadField({
       return;
     }
 
+    const podAsset = getTransparentPodAsset(null, value, null);
+    if (podAsset) {
+      setPreviewUrl(podAsset);
+      return;
+    }
+
     // Se já for data URL base64 ou blob
     if (value.startsWith("data:") || value.startsWith("blob:")) {
       setPreviewUrl(value);
       return;
     }
 
-    resolveProductImage(value).then((resolved) => {
-      if (active && resolved) {
-        setPreviewUrl(resolved);
-      } else if (active) {
-        setPreviewUrl(value);
+    resolveProductImage(value).then(async (resolved) => {
+      if (!active) return;
+      const target = resolved || value;
+      try {
+        const clean = await removeWhiteBackgroundClientSide(target);
+        if (active) setPreviewUrl(clean);
+      } catch {
+        if (active) setPreviewUrl(target);
       }
     });
 
@@ -209,10 +220,15 @@ export function ImageUploadField({
         <div className="rounded-xl border border-primary/30 bg-card/80 p-3 flex flex-col sm:flex-row items-center justify-between gap-3 backdrop-blur-sm">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-lg border border-primary/20 bg-slate-950 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+              <div
+                className="pointer-events-none absolute inset-0 -m-2 rounded-full opacity-35 blur-md"
+                style={{ background: "rgba(168, 85, 247, 0.3)" }}
+                aria-hidden="true"
+              />
               <img
                 src={previewUrl || value}
                 alt="Prévia do produto"
-                className="h-full w-full object-contain"
+                className="relative z-10 h-full w-full object-contain drop-shadow-md"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src =
                     "https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=200&auto=format&fit=crop&q=80";
@@ -235,7 +251,33 @@ export function ImageUploadField({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isUploading}
+              onClick={async () => {
+                if (!previewUrl && !value) return;
+                try {
+                  const target = previewUrl || value;
+                  const cleaned = await removeWhiteBackgroundClientSide(target);
+                  if (cleaned) {
+                    onChange(cleaned);
+                    setPreviewUrl(cleaned);
+                    setSuccessStatus("Fundo branco removido com sucesso!");
+                  }
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+              className="text-xs h-8 gap-1.5 border-purple-500/40 text-purple-300 hover:border-purple-400 hover:text-white hover:bg-purple-950/40 cursor-pointer"
+              title="Remove o fundo branco preservando cores e qualidade do produto"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+              Remover Fundo
+            </Button>
+
             <Button
               type="button"
               variant="outline"

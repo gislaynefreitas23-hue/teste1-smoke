@@ -5,6 +5,7 @@ import { Check, Eye, Package, Plus, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatBRL, resolveProductImage, type Product } from "@/lib/brasa";
+import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 
@@ -12,7 +13,9 @@ export function ProductCard({ product }: { product: Product }) {
   const navigate = useNavigate();
   const { add } = useCart();
   const { selectedCityId } = useCity();
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(() => {
+    return getTransparentPodAsset(product.id, product.image_url, product.name) || null;
+  });
 
   const targetCity = product.city_id || selectedCityId || "cuiaba";
   const stock = typeof product.stock === "number" ? product.stock : 15;
@@ -23,13 +26,26 @@ export function ProductCard({ product }: { product: Product }) {
 
   useEffect(() => {
     let active = true;
-    resolveProductImage(product.image_url).then((url) => {
-      if (active) setImage(url);
+    const fastAsset = getTransparentPodAsset(product.id, product.image_url, product.name);
+    if (fastAsset) {
+      setImage(fastAsset);
+      return;
+    }
+
+    resolveProductImage(product.image_url).then(async (url) => {
+      if (active && url) {
+        try {
+          const clean = await removeWhiteBackgroundClientSide(url);
+          if (active) setImage(clean);
+        } catch {
+          if (active) setImage(url);
+        }
+      }
     });
     return () => {
       active = false;
     };
-  }, [product.image_url]);
+  }, [product.id, product.image_url, product.name]);
 
   const handleOpenProduct = () => {
     navigate({
@@ -53,7 +69,14 @@ export function ProductCard({ product }: { product: Product }) {
         }}
         aria-label={`Ver detalhes do produto ${product.name}`}
       >
-        <div className="aspect-square w-full bg-slate-950/60 relative overflow-hidden flex items-center justify-center">
+        <div className="aspect-square w-full bg-slate-950/40 relative overflow-hidden flex items-center justify-center">
+          {/* Brilho neon difuso roxo de fundo integrado, sem quadrado ou caixa sólida */}
+          <div
+            className="pointer-events-none absolute inset-0 -m-4 rounded-full opacity-35 blur-2xl transition-all duration-500 group-hover:opacity-60"
+            style={{ background: "rgba(168, 85, 247, 0.22)" }}
+            aria-hidden="true"
+          />
+
           {/* Badge de Destaque: Lançamento ou Promoção */}
           <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1">
             {product.badge === "lancamento" && (
@@ -85,10 +108,10 @@ export function ProductCard({ product }: { product: Product }) {
               loading="lazy"
               width={600}
               height={600}
-              className="h-full w-full object-contain p-3 transition-transform duration-300 group-hover:scale-105"
+              className="relative z-10 h-full w-full object-contain p-3 drop-shadow-[0_12px_24px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+            <div className="relative z-10 flex h-full w-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
               {product.name}
             </div>
           )}

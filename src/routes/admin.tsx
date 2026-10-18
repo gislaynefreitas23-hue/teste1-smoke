@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUploadField } from "@/components/ImageUploadField";
+import { ProductImage } from "@/components/ProductImage";
 import { supabase } from "@/integrations/supabase/client";
 import { formatBRL, resolveProductImage } from "@/lib/brasa";
 import {
@@ -1962,13 +1963,16 @@ function ProductsManagementSection() {
                   </div>
 
                   <div className="flex gap-3 items-center">
-                    <div className="h-16 w-16 shrink-0 rounded-xl border border-slate-800 bg-slate-950 p-1 flex items-center justify-center overflow-hidden">
-                      {p.image_url ? (
-                        <img src={p.image_url} alt={p.name} className="h-full w-full object-contain" />
-                      ) : (
-                        <ShoppingBag className="h-6 w-6 text-slate-700" />
-                      )}
-                    </div>
+                    <ProductImage
+                      src={p.image_url}
+                      alt={p.name}
+                      productId={p.id}
+                      productName={p.name}
+                      glowEffect={false}
+                      aspectRatio="auto"
+                      containerClassName="h-16 w-16 shrink-0 rounded-xl border border-slate-800 bg-slate-950 p-1"
+                      showPlaceholderName={false}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <h4 className="font-bold text-white text-sm truncate">{p.name}</h4>

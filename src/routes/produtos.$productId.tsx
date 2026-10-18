@@ -34,6 +34,7 @@ import { useCart } from "@/lib/cart";
 import { useCity } from "@/lib/city";
 import { useAuthSession } from "@/lib/useAuth";
 import { ProductCard } from "@/components/ProductCard";
+import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 
 export const Route = createFileRoute("/produtos/$productId")({
   head: ({ params }) => ({
@@ -80,20 +81,35 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
     .filter((p) => p.id !== productId && (p.category === product?.category || true))
     .slice(0, 3);
 
-  // Carrega e assina a imagem do produto
+  // Carrega e assina a imagem do produto, aplicando transparência limpa se necessário
   useEffect(() => {
-    if (product?.image_url) {
+    if (product) {
       let active = true;
-      resolveProductImage(product.image_url).then((url) => {
-        if (active) setResolvedImage(url);
-      });
+      const fastAsset = getTransparentPodAsset(product.id, product.image_url, product.name);
+      if (fastAsset) {
+        setResolvedImage(fastAsset);
+        return;
+      }
+
+      if (product.image_url) {
+        resolveProductImage(product.image_url).then(async (url) => {
+          if (active && url) {
+            try {
+              const clean = await removeWhiteBackgroundClientSide(url);
+              if (active) setResolvedImage(clean);
+            } catch {
+              if (active) setResolvedImage(url);
+            }
+          }
+        });
+      } else {
+        setResolvedImage(null);
+      }
       return () => {
         active = false;
       };
-    } else {
-      setResolvedImage(null);
     }
-  }, [product?.image_url]);
+  }, [product?.id, product?.image_url, product?.name]);
 
   // Reseta quantidade quando muda de produto
   useEffect(() => {
@@ -221,7 +237,14 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-start">
         {/* Coluna Esquerda: Imagem em Destaque */}
         <div className="space-y-4">
-          <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-primary/25 bg-card/70 p-6 flex items-center justify-center shadow-2xl backdrop-blur-md">
+          <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-primary/25 bg-card/60 p-6 flex items-center justify-center shadow-2xl backdrop-blur-md">
+            {/* Brilho neon difuso roxo de fundo integrado */}
+            <div
+              className="pointer-events-none absolute inset-0 -m-8 rounded-full opacity-45 blur-3xl transition-all duration-500"
+              style={{ background: "rgba(168, 85, 247, 0.3)" }}
+              aria-hidden="true"
+            />
+
             {/* Badges de Destaque */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {product.badge === "lancamento" && (
@@ -250,7 +273,7 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
               <img
                 src={resolvedImage}
                 alt={product.name}
-                className="h-full w-full object-contain p-4 transition-transform duration-500 hover:scale-105"
+                className="relative z-10 h-full w-full object-contain p-4 drop-shadow-[0_16px_36px_rgba(0,0,0,0.6)] transition-transform duration-500 hover:scale-105"
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
