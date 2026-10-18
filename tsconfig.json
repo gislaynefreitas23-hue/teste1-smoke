@@ -1,4 +1,5 @@
 {
+  "exclude": ["src/test/**"],
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
