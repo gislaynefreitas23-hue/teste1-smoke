@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CartProvider } from "@/lib/cart";
 import { CityProvider } from "@/lib/city";
 import { Route as ProductDetailRoute } from "@/routes/produtos.$productId";
 import { Route as ProdutoRedirectRoute } from "@/routes/produto.$productId";
+import { ProductCard } from "@/components/ProductCard";
+import { processCheckout } from "@/lib/payment/service";
 import type { Product } from "@/lib/brasa";
 
 const mockNavigate = vi.fn();
@@ -46,6 +48,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     from: () => ({
       select: () => ({
+        in: () => Promise.resolve({ data: [mockProductDb], error: null }),
         eq: () => ({
           maybeSingle: async () => ({
             data: {
@@ -62,7 +65,9 @@ vi.mock("@/integrations/supabase/client", () => ({
           order: () => Promise.resolve({ data: [mockProductDb], error: null }),
         }),
       }),
+      insert: () => Promise.resolve({ data: { id: "order-123" }, error: null }),
     }),
+    rpc: () => Promise.resolve({ data: { id: "order-123" }, error: null }),
     storage: {
       from: () => ({
         createSignedUrl: async () => ({ data: { signedUrl: "https://example.com/signed-ignite.jpg" }, error: null }),
@@ -214,5 +219,75 @@ describe("Página Individual de Detalhes do Produto & Fluxo de Compra", () => {
 
     expect(screen.getByText(/5% em cashback/i)).toBeInTheDocument();
     expect(screen.getByText(/Pagamento somente na entrega/i)).toBeInTheDocument();
+  });
+
+  it("6. Valida o fluxo completo: Catálogo → Detalhes → Carrinho → Checkout → Confirmação do Pedido", async () => {
+    // Passo 1: Catálogo - Clicar no Card navega para /produtos/$productId
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CityProvider>
+          <CartProvider initialCity="cuiaba">
+            <ProductCard product={mockProductDb} />
+          </CartProvider>
+        </CityProvider>
+      </QueryClientProvider>
+    );
+
+    const card = screen.getByRole("button", {
+      name: /Ver detalhes do produto Pod Descartável Ignite V80 8000 Puffs/i,
+    });
+    fireEvent.click(card);
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: "/produtos/$productId",
+      params: { productId: "prod-pod-ignite" },
+    });
+
+    cleanup();
+
+    // Passo 2: Detalhes do Produto - Aumentar quantidade e Comprar Agora
+    mockNavigate.mockClear();
+    renderProductPage();
+
+    const incBtn = await screen.findByLabelText("Aumentar quantidade");
+    fireEvent.click(incBtn); // quantidade = 2
+
+    const buyNowBtn = await screen.findByRole("button", { name: /Comprar Agora/i });
+    fireEvent.click(buyNowBtn);
+
+    // Passo 3: Carrinho atualizado e redirecionado para /checkout
+    expect(mockNavigate).toHaveBeenCalledWith({ to: "/checkout" });
+    const cart = JSON.parse(localStorage.getItem("brasa-cart") || "[]");
+    expect(cart.length).toBe(1);
+    expect(cart[0].id).toBe("prod-pod-ignite");
+    expect(cart[0].qty).toBe(2);
+
+    // Passo 4 & 5: Checkout e Confirmação do Pedido com Pagamento na Entrega
+    const checkoutResult = await processCheckout({
+      items: [{ id: "prod-pod-ignite", qty: 2 }],
+      customer: { name: "Marcos Pantanal", phone: "65999991234" },
+      address: {
+        cep: "78000-000",
+        rua: "Av das Flores",
+        numero: "120",
+        bairro: "Jardim Cuiabá",
+        cidade: "Cuiabá",
+        uf: "MT",
+      },
+      paymentMethod: "delivery",
+      deliveryDetails: { type: "pix" },
+      selectedCityId: "cuiaba",
+      useCashback: false,
+      idempotencyKey: `idemp-complete-flow-${Date.now()}`,
+    });
+
+    // Confirmação do Pedido gerada com sucesso
+    expect(checkoutResult.orderId).toBeDefined();
+    expect(checkoutResult.paymentResult.status).toBe("aguardando_pagamento");
+    expect(checkoutResult.paymentResult.method).toBe("delivery");
+    // Preço validado no banco (99.90 * 2) = 199.80 + 10.00 (frete Cuiabá) = 209.80
+    expect(checkoutResult.orderSummary.subtotal).toBeCloseTo(199.8);
+    expect(checkoutResult.orderSummary.deliveryFee).toBe(10);
+    expect(checkoutResult.orderSummary.total).toBeCloseTo(209.8);
   });
 });
