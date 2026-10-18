@@ -329,12 +329,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const noop = () => {};
+const FALLBACK_CART: CartContextValue = {
+  items: [], add: () => false, setQty: noop, remove: noop, clear: noop,
+  count: 0, subtotal: 0, cartCityId: null, cityConflictWarning: null,
+  dismissCityConflictWarning: noop, lastAddedProduct: null,
+  isNotificationVisible: false, dismissNotification: noop,
+};
+
 export function useSafeCart() {
   return useContext(CartContext);
 }
 
 export function useCart() {
   const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart precisa estar dentro de CartProvider");
-  return ctx;
+  // Fallback seguro: nunca derruba a página se o Provider não estiver disponível
+  // (ex.: durante recarregamento do módulo).
+  return ctx ?? FALLBACK_CART;
 }
