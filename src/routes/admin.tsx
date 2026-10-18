@@ -1547,7 +1547,7 @@ function ProductsManagementSection() {
     const spActive = draft.active && (draft.availability === "both" || draft.availability === "sao-paulo");
 
     try {
-      await supabase.from("product_city_inventories").upsert(
+      await (supabase as any).from("product_city_inventories").upsert(
         [
           {
             product_id: productId,
@@ -1625,7 +1625,7 @@ function ProductsManagementSection() {
     setBusy(true);
 
     try {
-      await supabase.from("product_city_inventories").delete().eq("product_id", productId);
+      await (supabase as any).from("product_city_inventories").delete().eq("product_id", productId);
       await supabase.from("products").delete().eq("id", productId);
     } catch {
       // ignore
@@ -1923,7 +1923,7 @@ function ProductsManagementSection() {
           {products.map((p, idx) => {
             const badge = (settings.productBadges && settings.productBadges[p.id]) || "nenhum";
             const promoPrice = (settings.productPromoPrices && settings.productPromoPrices[p.id]) || null;
-            const inventories = Array.isArray(p.product_city_inventories) ? p.product_city_inventories : [];
+            const inventories = Array.isArray((p as any).product_city_inventories) ? (p as any).product_city_inventories : [];
             const cuiabaInv = inventories.find((i: any) => i.city_id === "cuiaba");
             const spInv = inventories.find((i: any) => i.city_id === "sao-paulo");
 

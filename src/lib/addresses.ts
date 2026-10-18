@@ -53,7 +53,7 @@ export async function listCustomerAddresses(
   if (!userId) return [];
 
   try {
-    const { data, error } = await (supabase.from("customer_addresses") as any)
+    const { data, error } = await ((supabase as any).from("customer_addresses"))
       .select("*")
       .eq("user_id", userId)
       .eq("city_id", cityId)
@@ -92,7 +92,7 @@ export async function saveCustomerAddress(
   };
 
   try {
-    const { data, error } = await (supabase.from("customer_addresses") as any)
+    const { data, error } = await ((supabase as any).from("customer_addresses"))
       .insert(payload)
       .select("*")
       .single();
@@ -122,7 +122,7 @@ export async function updateCustomerAddress(
   updates: Partial<CustomerAddressInput>
 ): Promise<void> {
   try {
-    const { error } = await (supabase.from("customer_addresses") as any)
+    const { error } = await ((supabase as any).from("customer_addresses"))
       .update({
         ...updates,
         updated_at: new Date().toISOString(),
@@ -148,7 +148,7 @@ export async function updateCustomerAddress(
  */
 export async function deleteCustomerAddress(id: string): Promise<void> {
   try {
-    const { error } = await (supabase.from("customer_addresses") as any)
+    const { error } = await ((supabase as any).from("customer_addresses"))
       .delete()
       .eq("id", id);
 

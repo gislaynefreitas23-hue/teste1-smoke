@@ -48,7 +48,7 @@ export function CitySection({ id = "cidades", className = "" }: CitySectionProps
             <span className="text-border">•</span>
             <button
               type="button"
-              onClick={openSelector}
+              onClick={() => openSelector()}
               className="font-semibold text-primary hover:underline cursor-pointer"
             >
               Alterar cidade
