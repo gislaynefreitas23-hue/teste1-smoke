@@ -141,10 +141,14 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
             continue;
           }
 
+          const cleanCategory = (p.category || "").trim().toLowerCase().startsWith("pod")
+            ? "Pod Descartável"
+            : (p.category || "").trim();
+
           filteredList.push({
             id: p.id,
-            name: p.name,
-            category: p.category,
+            name: (p.name || "").trim(),
+            category: cleanCategory,
             description: p.description,
             flavor_profile: p.flavor_profile,
             intensity: p.intensity,
@@ -169,10 +173,14 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
           const cuiabaOverride = settings.cityInventories?.[p.id]?.cuiaba;
           const spOverride = settings.cityInventories?.[p.id]?.["sao-paulo"];
 
+          const cleanCategory = (p.category || "").trim().toLowerCase().startsWith("pod")
+            ? "Pod Descartável"
+            : (p.category || "").trim();
+
           filteredList.push({
             id: p.id,
-            name: p.name,
-            category: p.category,
+            name: (p.name || "").trim(),
+            category: cleanCategory,
             description: p.description,
             flavor_profile: p.flavor_profile,
             intensity: p.intensity,
@@ -213,7 +221,7 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
         };
       });
 
-      // Ordenação customizada: respeita a sequência de IDs definida no painel
+      // Ordenação: se há productOrder definida nas configurações, segue rigorosamente
       if (productOrder.length > 0) {
         enrichedList.sort((a, b) => {
           const indexA = productOrder.indexOf(a.id);
@@ -221,6 +229,21 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
           const posA = indexA !== -1 ? indexA : 9999;
           const posB = indexB !== -1 ? indexB : 9999;
           if (posA !== posB) return posA - posB;
+          return a.name.localeCompare(b.name);
+        });
+      } else {
+        // Padrão: Pods primeiro, depois Essências, Kits e Acessórios
+        const categoryPriority: Record<string, number> = {
+          "Pod Descartável": 1,
+          "Pod descartável": 1,
+          "Essência": 2,
+          "Kit": 3,
+          "Acessório": 4,
+        };
+        enrichedList.sort((a, b) => {
+          const prioA = categoryPriority[a.category] ?? 10;
+          const prioB = categoryPriority[b.category] ?? 10;
+          if (prioA !== prioB) return prioA - prioB;
           return a.name.localeCompare(b.name);
         });
       }
@@ -360,10 +383,14 @@ export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" |
       const badge = productBadges[p.id] || "nenhum";
       const promoPrice = productPromoPrices[p.id];
 
+      const cleanCategory = (p.category || "").trim().toLowerCase().startsWith("pod")
+        ? "Pod Descartável"
+        : (p.category || "").trim();
+
       return {
         id: p.id,
-        name: p.name,
-        category: p.category,
+        name: (p.name || "").trim(),
+        category: cleanCategory,
         description: p.description,
         flavor_profile: p.flavor_profile,
         intensity: p.intensity,

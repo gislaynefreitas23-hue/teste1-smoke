@@ -1,11 +1,14 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Truck, Wallet } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Sparkles, Truck, Wallet } from "lucide-react";
 
 import brandImage from "@/assets/pantanal-brand.png";
 import { Button } from "@/components/ui/button";
 import { CitySection } from "@/components/CitySection";
+import { ProductCard } from "@/components/ProductCard";
+import { ProductBannerCarousel } from "@/components/ProductBannerCarousel";
 import { WhatsAppOrderSection } from "@/components/WhatsAppOrderSection";
-import { formatBRL } from "@/lib/brasa";
+import { formatBRL, productsQueryOptions } from "@/lib/brasa";
 import { useStoreSettings } from "@/lib/store-settings";
 import { useCity } from "@/lib/city";
 
@@ -31,8 +34,12 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  const { requireCityOrNavigate } = useCity();
+  const { requireCityOrNavigate, selectedCityId } = useCity();
   const { settings } = useStoreSettings();
+  const currentCity = selectedCityId || "cuiaba";
+
+  const { data: allProducts = [] } = useQuery(productsQueryOptions(currentCity));
+  const featuredProducts = allProducts.slice(0, 6);
 
   return (
     <main className="mx-auto max-w-6xl px-4">
@@ -70,8 +77,44 @@ function Home() {
         </div>
       </section>
 
+      {/* Carrossel de Banners com Destaques e Lançamentos */}
+      <ProductBannerCarousel />
+
       {/* Seção de Seleção de Cidade na entrada da loja */}
       <CitySection />
+
+      {/* Vitrine de Produtos em Destaque na Página Inicial */}
+      {featuredProducts.length > 0 && (
+        <section className="my-10 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/20 border border-purple-500/40 px-3 py-1 text-xs font-bold text-purple-300 mb-2">
+                <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                Lançamentos & Destaques
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                EBCREATE BC Pro 40K
+              </h2>
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                Os modelos mais procurados com sabor refinado, 40.000 puffs e entrega rápida.
+              </p>
+            </div>
+
+            <Button variant="outline" className="text-xs font-bold gap-2 self-start sm:self-auto" asChild>
+              <Link to="/produtos">
+                Ver Catálogo Completo
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {featuredProducts.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Seção de Pedido pelo WhatsApp */}
       <WhatsAppOrderSection className="my-8" />

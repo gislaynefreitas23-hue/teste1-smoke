@@ -130,7 +130,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Aurora Berries",
       puffs: "40.000 PUFFS",
       footerPhrase: "Consistência de Sabor de Alta Performance",
-      imageUrl: auroraImg,
+      imageUrl: "https://whvvxnwrldzyafwiflir.supabase.co/storage/v1/object/sign/products/catalog-1792350992493-3eqo0x.png",
       active: true,
       order: 1,
     },
@@ -140,7 +140,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Pink Lemonade",
       puffs: "40.000 PUFFS",
       footerPhrase: "Gerenciamento de Potência e Autonomia Estendida",
-      imageUrl: pinkLemonadeImg,
+      imageUrl: "https://whvvxnwrldzyafwiflir.supabase.co/storage/v1/object/sign/products/produto-1792213432848-3famu6.png",
       active: true,
       order: 2,
     },
@@ -150,14 +150,28 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Toasted Pineapple",
       puffs: "40.000 PUFFS",
       footerPhrase: "Design Funcional com Visibilidade de Essência",
-      imageUrl: toastedPineappleImg,
+      imageUrl: "https://whvvxnwrldzyafwiflir.supabase.co/storage/v1/object/sign/products/produto-1792213247568-mp0v24.png",
       active: true,
       order: 3,
     },
   ],
-  productBadges: {},
+  productBadges: {
+    "055e851d-e131-41c4-bbb5-6e358c2e719b": "lancamento",
+    "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff": "lancamento",
+    "e8717cb6-9ceb-4997-9162-09e08fbefb41": "lancamento",
+    "9739d60d-33e4-4540-8d0b-2bdeda2cae86": "lancamento",
+    "1eeb97e8-5f52-48a4-9847-cd62daf9b37f": "lancamento",
+    "566e06a8-2051-40f7-90df-70b0a275a1ad": "lancamento",
+  },
   productPromoPrices: {},
-  productOrder: [],
+  productOrder: [
+    "055e851d-e131-41c4-bbb5-6e358c2e719b", // Aurora Berries
+    "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff", // Pink Lemonade
+    "e8717cb6-9ceb-4997-9162-09e08fbefb41", // Golden Berry
+    "9739d60d-33e4-4540-8d0b-2bdeda2cae86", // Pineapple Toasted
+    "1eeb97e8-5f52-48a4-9847-cd62daf9b37f", // Triple Berry
+    "566e06a8-2051-40f7-90df-70b0a275a1ad", // Clear
+  ],
 };
 
 const SETTINGS_STORAGE_KEY = "pantanal_store_settings";
@@ -178,12 +192,19 @@ export function getStoreSettings(): StoreSettings {
     return {
       ...DEFAULT_STORE_SETTINGS,
       ...parsed,
-      banners: Array.isArray(parsed.banners) && parsed.banners.length > 0
-        ? parsed.banners
-        : DEFAULT_STORE_SETTINGS.banners,
-      productBadges: parsed.productBadges || {},
+      banners:
+        Array.isArray(parsed.banners) && parsed.banners.length > 0
+          ? parsed.banners
+          : DEFAULT_STORE_SETTINGS.banners,
+      productBadges:
+        parsed.productBadges && Object.keys(parsed.productBadges).length > 0
+          ? parsed.productBadges
+          : DEFAULT_STORE_SETTINGS.productBadges,
       productPromoPrices: parsed.productPromoPrices || {},
-      productOrder: Array.isArray(parsed.productOrder) ? parsed.productOrder : [],
+      productOrder:
+        Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
+          ? parsed.productOrder
+          : DEFAULT_STORE_SETTINGS.productOrder,
     };
   } catch {
     return DEFAULT_STORE_SETTINGS;
@@ -244,9 +265,15 @@ export async function fetchRemoteStoreSettings(): Promise<StoreSettings | null> 
             Array.isArray(parsed.banners) && parsed.banners.length > 0
               ? parsed.banners
               : DEFAULT_STORE_SETTINGS.banners,
-          productBadges: parsed.productBadges || {},
+          productBadges:
+            parsed.productBadges && Object.keys(parsed.productBadges).length > 0
+              ? parsed.productBadges
+              : DEFAULT_STORE_SETTINGS.productBadges,
           productPromoPrices: parsed.productPromoPrices || {},
-          productOrder: Array.isArray(parsed.productOrder) ? parsed.productOrder : [],
+          productOrder:
+            Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
+              ? parsed.productOrder
+              : DEFAULT_STORE_SETTINGS.productOrder,
         };
         saveStoreSettingsLocally(merged);
         return merged;

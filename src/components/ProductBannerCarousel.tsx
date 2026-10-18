@@ -1,13 +1,60 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Sparkles, Zap, Gauge } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, Zap, Gauge, ArrowRight } from "lucide-react";
 
 import imgAurora from "@/assets/banner-aurora-berries.png";
 import imgPinkLemonade from "@/assets/banner-pink-lemonade.png";
 import imgToastedPineapple from "@/assets/banner-toasted-pineapple.png";
+import { resolveProductImage } from "@/lib/brasa";
 import { useStoreSettings } from "@/lib/store-settings";
+
+const POD_PRODUCT_IDS: Record<string, string> = {
+  "Aurora Berries": "055e851d-e131-41c4-bbb5-6e358c2e719b",
+  "Pink Lemonade": "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
+  "Toasted Pineapple": "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
+  "Pineapple Toasted": "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
+  "Golden Berry": "e8717cb6-9ceb-4997-9162-09e08fbefb41",
+  "Triple Berry": "1eeb97e8-5f52-48a4-9847-cd62daf9b37f",
+  "Clear": "566e06a8-2051-40f7-90df-70b0a275a1ad",
+};
+
+function CarouselSlideImage({
+  imageUrl,
+  alt,
+  isEager,
+}: {
+  imageUrl: string;
+  alt: string;
+  isEager: boolean;
+}) {
+  const [resolvedUrl, setResolvedUrl] = useState<string>(imageUrl);
+
+  useEffect(() => {
+    let active = true;
+    if (imageUrl) {
+      resolveProductImage(imageUrl).then((url) => {
+        if (active && url) {
+          setResolvedUrl(url);
+        }
+      });
+    }
+    return () => {
+      active = false;
+    };
+  }, [imageUrl]);
+
+  return (
+    <img
+      src={resolvedUrl}
+      alt={alt}
+      className="relative z-10 h-full w-full object-contain drop-shadow-[0_14px_28px_rgba(52,49,59,0.22)] transition-transform duration-500 hover:scale-105"
+      loading={isEager ? "eager" : "lazy"}
+    />
+  );
+}
 
 type SlideItem = {
   id: number;
+  productId?: string;
   name: string;
   puffs: string;
   image: string;
@@ -67,25 +114,32 @@ export function ProductBannerCarousel() {
   const activeBanners = settings.banners.filter((b) => b.active);
   const slides: SlideItem[] =
     activeBanners.length > 0
-      ? activeBanners.map((b, idx) => ({
-          id: idx + 1,
-          name: b.title,
-          puffs: b.puffs,
-          image: b.imageUrl || SLIDES[idx % SLIDES.length]?.image || imgAurora,
-          subtitle: "Série Especial Turbo",
-          footerPhrase: b.footerPhrase,
-          flavorDesc:
-            SLIDES[idx % SLIDES.length]?.flavorDesc ||
-            "Perfil refinado e vapor denso de alta durabilidade.",
-          features:
-            SLIDES[idx % SLIDES.length]?.features || [
-              "Alta Performance",
-              "Bateria Recarregável",
-              "Modo Turbo",
-            ],
-          glowColor:
-            SLIDES[idx % SLIDES.length]?.glowColor || "rgba(168, 85, 247, 0.45)",
-        }))
+      ? activeBanners.map((b, idx) => {
+          const cleanTitle = (b.title || "").trim();
+          const shortTitle = cleanTitle.replace(/^EBCREATE BC Pro 40K\s*[-–]\s*/i, "").trim();
+          const matchedProdId = POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
+
+          return {
+            id: idx + 1,
+            productId: matchedProdId,
+            name: b.title,
+            puffs: b.puffs,
+            image: b.imageUrl || SLIDES[idx % SLIDES.length]?.image || imgAurora,
+            subtitle: "Série Especial Turbo",
+            footerPhrase: b.footerPhrase,
+            flavorDesc:
+              SLIDES[idx % SLIDES.length]?.flavorDesc ||
+              "Perfil refinado e vapor denso de alta durabilidade.",
+            features:
+              SLIDES[idx % SLIDES.length]?.features || [
+                "Alta Performance",
+                "Bateria Recarregável",
+                "Modo Turbo",
+              ],
+            glowColor:
+              SLIDES[idx % SLIDES.length]?.glowColor || "rgba(168, 85, 247, 0.45)",
+          };
+        })
       : SLIDES;
 
   const totalSlides = slides.length;
@@ -240,24 +294,39 @@ export function ProductBannerCarousel() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Botão de ação direta para o produto */}
+                    <div className="pt-2 flex items-center gap-3">
+                      <a
+                        href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
+                        className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] px-4 py-2 text-xs font-bold text-white shadow-[0_4px_14px_rgba(168,85,247,0.35)] transition-all hover:scale-105 hover:shadow-[0_6px_20px_rgba(168,85,247,0.55)] cursor-pointer"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                        Ver Detalhes & Pedir
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
                   </div>
 
                   {/* Coluna 2: Produto com Fumaça Roxa Integrada (Sem Caixa Branca) */}
                   <div className="flex items-center justify-center md:col-span-5 lg:col-span-4">
-                    <div className="relative flex h-64 w-full max-w-[260px] items-center justify-center sm:h-72 sm:max-w-[280px] md:h-84">
+                    <a
+                      href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
+                      className="group/img relative flex h-64 w-full max-w-[260px] items-center justify-center sm:h-72 sm:max-w-[280px] md:h-84 cursor-pointer"
+                      aria-label={`Ver detalhes de ${slide.name}`}
+                    >
                       {/* Iluminação difusa roxa projetada atrás da imagem original do produto */}
                       <div
-                        className="pointer-events-none absolute inset-0 -m-6 rounded-full opacity-40 blur-2xl transition-all duration-500"
+                        className="pointer-events-none absolute inset-0 -m-6 rounded-full opacity-40 blur-2xl transition-all duration-500 group-hover/img:opacity-65"
                         style={{ background: slide.glowColor }}
                         aria-hidden="true"
                       />
-                      <img
-                        src={slide.image}
+                      <CarouselSlideImage
+                        imageUrl={slide.image}
                         alt={`${slide.name} — ${slide.puffs}`}
-                        className="relative z-10 h-full w-full object-contain drop-shadow-[0_14px_28px_rgba(52,49,59,0.22)] transition-transform duration-500 hover:scale-105"
-                        loading={index === 0 ? "eager" : "lazy"}
+                        isEager={index === 0}
                       />
-                    </div>
+                    </a>
                   </div>
                 </div>
               </div>

@@ -40,7 +40,13 @@ function Produtos() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo(() => {
-    return ["Todos", ...new Set(products.map((p) => p.category))];
+    const set = new Set(products.map((p) => p.category));
+    const sortedCategories = Array.from(set).sort((a, b) => {
+      if (a.toLowerCase().includes("pod")) return -1;
+      if (b.toLowerCase().includes("pod")) return 1;
+      return a.localeCompare(b);
+    });
+    return ["Todos", ...sortedCategories];
   }, [products]);
 
   const visible = useMemo(() => {
