@@ -18,9 +18,9 @@ export type CartItem = {
   name: string;
   price: number;
   qty: number;
-  cityId?: "cuiaba" | "sao-paulo";
-  stock?: number;
-  imageUrl?: string;
+  cityId?: "cuiaba" | "sao-paulo" | undefined;
+  stock?: number | undefined;
+  imageUrl?: string | undefined;
 };
 
 export type CartContextValue = {
@@ -30,9 +30,9 @@ export type CartContextValue = {
       id: string;
       name: string;
       price: number;
-      cityId?: "cuiaba" | "sao-paulo";
-      stock?: number;
-      imageUrl?: string;
+      cityId?: "cuiaba" | "sao-paulo" | undefined;
+      stock?: number | undefined;
+      imageUrl?: string | undefined;
     },
     quantity?: number,
   ) => boolean;
@@ -182,9 +182,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         id: string;
         name: string;
         price: number;
-        cityId?: "cuiaba" | "sao-paulo";
-        stock?: number;
-        imageUrl?: string;
+        cityId?: "cuiaba" | "sao-paulo" | undefined;
+        stock?: number | undefined;
+        imageUrl?: string | undefined;
       },
       quantity: number = 1,
     ): boolean => {
