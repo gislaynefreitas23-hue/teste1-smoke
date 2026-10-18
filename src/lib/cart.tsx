@@ -1,3 +1,4 @@
+import type React from "react";
 import {
   createContext,
   useCallback,
@@ -48,7 +49,14 @@ export type CartContextValue = {
   dismissNotification: () => void;
 };
 
-export const CartContext = createContext<CartContextValue | null>(null);
+// Mantém o mesmo contexto entre recarregamentos do módulo (HMR), evitando que
+// o Provider e os consumidores fiquem com instâncias diferentes.
+const globalForCart = globalThis as unknown as {
+  __pantanalCartContext?: React.Context<CartContextValue | null>;
+};
+export const CartContext =
+  globalForCart.__pantanalCartContext ??
+  (globalForCart.__pantanalCartContext = createContext<CartContextValue | null>(null));
 
 const CART_EVENT_NAME = "pantanal_cart_updated";
 
