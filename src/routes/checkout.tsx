@@ -302,7 +302,7 @@ function CheckoutPage() {
       .then(({ data }) => {
         if (active && typeof data === "number") setBalance(data);
       })
-      .catch(() => {});
+      .then(undefined, () => {});
     return () => {
       active = false;
     };

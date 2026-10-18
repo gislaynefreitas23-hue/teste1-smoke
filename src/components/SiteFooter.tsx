@@ -30,7 +30,7 @@ export function SiteFooter() {
             <span>•</span>
             <button
               type="button"
-              onClick={openSelector}
+              onClick={() => openSelector()}
               className="text-primary hover:underline font-semibold cursor-pointer"
             >
               Alterar cidade
