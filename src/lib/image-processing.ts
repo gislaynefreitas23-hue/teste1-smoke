@@ -146,13 +146,37 @@ export function getTransparentPodAsset(
 const processedImageCache = new Map<string, string>();
 
 /**
+ * Obtém instantaneamente a versão recortada transparente do cache (se já tiver sido processada)
+ */
+export function getCachedCleanImage(imageSrc?: string | null): string | null {
+  if (!imageSrc || typeof imageSrc !== "string") return null;
+  if (processedImageCache.has(imageSrc)) {
+    return processedImageCache.get(imageSrc)!;
+  }
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      const cacheKey = "ps_clean_" + (imageSrc.length > 80 ? imageSrc.slice(-60) : imageSrc);
+      const saved = sessionStorage.getItem(cacheKey);
+      if (saved) {
+        processedImageCache.set(imageSrc, saved);
+        return saved;
+      }
+    } catch {
+      // Ignora erro de acesso a storage
+    }
+  }
+  return null;
+}
+
+/**
  * Remove fundo branco incorporado em imagens de novos produtos enviados via navegador (HTML5 Canvas),
  * preservando integralmente o produto, logos, frutas e cores, sem utilizar mix-blend-mode.
  */
 export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise<string> {
   if (typeof window === "undefined" || !imageSrc) return imageSrc;
-  if (processedImageCache.has(imageSrc)) {
-    return processedImageCache.get(imageSrc)!;
+  const cached = getCachedCleanImage(imageSrc);
+  if (cached) {
+    return cached;
   }
 
   return new Promise((resolve) => {
@@ -318,6 +342,14 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
         ctx.putImageData(imgData, 0, 0);
         const transparentDataUrl = canvas.toDataURL("image/png");
         processedImageCache.set(imageSrc, transparentDataUrl);
+        if (typeof window !== "undefined" && window.sessionStorage) {
+          try {
+            const cacheKey = "ps_clean_" + (imageSrc.length > 80 ? imageSrc.slice(-60) : imageSrc);
+            sessionStorage.setItem(cacheKey, transparentDataUrl);
+          } catch {
+            // Ignora erro de quota do sessionStorage
+          }
+        }
         resolve(transparentDataUrl);
       } catch (err) {
         console.warn("Fallback de processamento de imagem:", err);

@@ -7,7 +7,11 @@ import imgToastedPineapple from "@/assets/banner-toasted-pineapple.png";
 import { resolveProductImage } from "@/lib/brasa";
 import { useStoreSettings } from "@/lib/store-settings";
 
-import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
+import {
+  getCachedCleanImage,
+  getTransparentPodAsset,
+  removeWhiteBackgroundClientSide,
+} from "@/lib/image-processing";
 
 export const POD_PRODUCT_IDS: Record<string, string> = {
   "Aurora Berries": "055e851d-e131-41c4-bbb5-6e358c2e719b",
@@ -37,26 +41,39 @@ export function CarouselSlideImage({
   productId?: string;
   productName?: string;
 }) {
-  const [resolvedUrl, setResolvedUrl] = useState<string>(() => {
-    return getTransparentPodAsset(productId, imageUrl, productName || alt) || imageUrl;
-  });
+  const instantAsset =
+    getTransparentPodAsset(productId, imageUrl, productName || alt) ||
+    getCachedCleanImage(imageUrl);
+
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(instantAsset);
+  const [isReady, setIsReady] = useState<boolean>(!!instantAsset);
 
   useEffect(() => {
     let active = true;
-    const fastAsset = getTransparentPodAsset(productId, imageUrl, productName || alt);
+    const fastAsset =
+      getTransparentPodAsset(productId, imageUrl, productName || alt) ||
+      getCachedCleanImage(imageUrl);
+
     if (fastAsset) {
       setResolvedUrl(fastAsset);
+      setIsReady(true);
       return;
     }
 
     if (imageUrl) {
       resolveProductImage(imageUrl).then(async (url) => {
-        if (active && url) {
-          try {
-            const clean = await removeWhiteBackgroundClientSide(url);
-            if (active) setResolvedUrl(clean);
-          } catch {
-            if (active) setResolvedUrl(url);
+        if (!active) return;
+        const target = url || imageUrl;
+        try {
+          const clean = await removeWhiteBackgroundClientSide(target);
+          if (active) {
+            setResolvedUrl(clean);
+            setIsReady(true);
+          }
+        } catch {
+          if (active) {
+            setResolvedUrl(target);
+            setIsReady(true);
           }
         }
       });
@@ -68,9 +85,11 @@ export function CarouselSlideImage({
 
   return (
     <img
-      src={resolvedUrl}
+      src={resolvedUrl || imageUrl}
       alt={alt}
-      className="relative z-10 h-full w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.55)] transition-transform duration-500 hover:scale-105"
+      className={`relative z-10 h-full w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.55)] transition-opacity duration-300 hover:scale-105 ${
+        isReady ? "opacity-100" : "opacity-0"
+      }`}
       loading={isEager ? "eager" : "lazy"}
     />
   );

@@ -8,7 +8,12 @@ import {
   SLIDES,
   type SlideItem,
 } from "./ProductBannerCarousel";
-import { getTransparentPodAsset } from "@/lib/image-processing";
+import {
+  getCachedCleanImage,
+  getTransparentPodAsset,
+  removeWhiteBackgroundClientSide,
+} from "@/lib/image-processing";
+import { resolveProductImage } from "@/lib/brasa";
 import imgAurora from "@/assets/banner-aurora-berries.png";
 
 export function MobileLaunchHeader({ className = "" }: { className?: string }) {
@@ -121,12 +126,48 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
     ? `/produtos/${activeSlide.productId}`
     : "/produtos";
 
-  const resolvedThumb =
-    getTransparentPodAsset(
-      activeSlide.productId,
-      activeSlide.image,
-      activeSlide.name
-    ) || activeSlide.image;
+  const instantThumb =
+    getTransparentPodAsset(activeSlide.productId, activeSlide.image, activeSlide.name) ||
+    getCachedCleanImage(activeSlide.image);
+
+  const [resolvedThumb, setResolvedThumb] = useState<string>(() => instantThumb || activeSlide.image);
+  const [isThumbReady, setIsThumbReady] = useState<boolean>(!!instantThumb);
+
+  useEffect(() => {
+    let active = true;
+    const fastAsset =
+      getTransparentPodAsset(activeSlide.productId, activeSlide.image, activeSlide.name) ||
+      getCachedCleanImage(activeSlide.image);
+
+    if (fastAsset) {
+      setResolvedThumb(fastAsset);
+      setIsThumbReady(true);
+      return;
+    }
+
+    if (activeSlide.image) {
+      resolveProductImage(activeSlide.image).then(async (url) => {
+        if (!active) return;
+        const target = url || activeSlide.image;
+        try {
+          const clean = await removeWhiteBackgroundClientSide(target);
+          if (active) {
+            setResolvedThumb(clean);
+            setIsThumbReady(true);
+          }
+        } catch {
+          if (active) {
+            setResolvedThumb(target);
+            setIsThumbReady(true);
+          }
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [activeSlide.productId, activeSlide.image, activeSlide.name]);
 
   return (
     <div
@@ -164,7 +205,9 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
             <img
               src={resolvedThumb}
               alt={activeSlide.name}
-              className="relative z-10 h-7 w-7 object-contain drop-shadow-[0_2px_6px_rgba(168,85,247,0.4)] transition-transform duration-300 group-hover:scale-110"
+              className={`relative z-10 h-7 w-7 object-contain drop-shadow-[0_2px_6px_rgba(168,85,247,0.4)] transition-opacity duration-300 group-hover:scale-110 ${
+                isThumbReady ? "opacity-100" : "opacity-0"
+              }`}
               loading="eager"
             />
           </div>
