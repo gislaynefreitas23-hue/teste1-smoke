@@ -17,6 +17,11 @@ export const POD_PRODUCT_IDS: Record<string, string> = {
   "Golden Berry": "e8717cb6-9ceb-4997-9162-09e08fbefb41",
   "Triple Berry": "1eeb97e8-5f52-48a4-9847-cd62daf9b37f",
   "Clear": "566e06a8-2051-40f7-90df-70b0a275a1ad",
+  "F*cking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+  "F**king Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+  "Fcking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+  "Sour Apple Ice": "06d6bbb2-7bdb-41e2-a822-d6ee17f5dc56",
+  "Blue Razz Ice": "e9cea634-18df-4035-a943-20b748a547fa",
 };
 
 export function CarouselSlideImage({
@@ -136,13 +141,16 @@ export function ProductBannerCarousel({
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
-  const activeBanners = settings.banners.filter((b) => b.active);
+  const activeBanners = settings.banners
+    .filter((b) => b.active)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
   const slides: SlideItem[] =
     activeBanners.length > 0
       ? activeBanners.map((b, idx) => {
           const cleanTitle = (b.title || "").trim();
           const shortTitle = cleanTitle.replace(/^EBCREATE BC Pro 40K\s*[-–]\s*/i, "").trim();
-          const matchedProdId = POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
+          const matchedProdId = b.productId || POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
 
           return {
             id: idx + 1,

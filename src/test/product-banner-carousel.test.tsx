@@ -176,4 +176,34 @@ describe("ProductBannerCarousel", () => {
     expect(actionButton?.className).toContain("whitespace-nowrap");
     expect(actionButton?.className).toContain("w-fit");
   });
+
+  it("renders newly added launch slide and links directly to product page", () => {
+    const customSettings = {
+      banners: [
+        {
+          id: "slide-fab",
+          badge: "LANÇAMENTO",
+          title: "F*cking Fab",
+          puffs: "40.000 PUFFS",
+          footerPhrase: "Conecte-se à sua vibe",
+          flavorDesc: "Uma combinação sensacional de frutas vermelhas e tropicais.",
+          imageUrl: "",
+          active: true,
+          order: 1,
+          productId: "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+        },
+      ],
+    };
+    localStorage.setItem("pantanal_store_settings", JSON.stringify(customSettings));
+
+    render(<ProductBannerCarousel />);
+
+    expect(screen.getByText("F*cking Fab")).toBeInTheDocument();
+    expect(
+      screen.getByText("Uma combinação sensacional de frutas vermelhas e tropicais.")
+    ).toBeInTheDocument();
+
+    const buttons = screen.getAllByRole("link", { name: /Conheça o lançamento F\*cking Fab/i });
+    expect(buttons[0]).toHaveAttribute("href", "/produtos/9c924bf4-e909-470a-b4f2-3038cab03dd7");
+  });
 });

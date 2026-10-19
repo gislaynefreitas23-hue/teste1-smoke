@@ -27,6 +27,78 @@ interface ImageUploadFieldProps {
   folderPrefix?: string;
 }
 
+function compressImageFile(file: File, maxDim = 600, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const src = e.target?.result;
+      if (typeof src !== "string") {
+        resolve("");
+        return;
+      }
+
+      // Se o arquivo já for leve (<= 100KB), utiliza diretamente o DataURL sem reprocessar
+      if (file.size <= 100 * 1024) {
+        resolve(src);
+        return;
+      }
+
+      let done = false;
+      const finish = (result: string) => {
+        if (!done) {
+          done = true;
+          resolve(result);
+        }
+      };
+
+      // Fallback de segurança (ex: jsdom sem engine de renderização de imagem)
+      const timer = setTimeout(() => finish(src), 200);
+
+      try {
+        const img = new Image();
+        img.onload = () => {
+          clearTimeout(timer);
+          try {
+            const naturalWidth = img.naturalWidth || img.width;
+            const naturalHeight = img.naturalHeight || img.height;
+            const scale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight));
+            const width = Math.max(1, Math.round(naturalWidth * scale));
+            const height = Math.max(1, Math.round(naturalHeight * scale));
+
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              finish(src);
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+
+            if (file.type === "image/png") {
+              finish(canvas.toDataURL("image/png"));
+            } else {
+              finish(canvas.toDataURL("image/webp", quality));
+            }
+          } catch {
+            finish(src);
+          }
+        };
+        img.onerror = () => {
+          clearTimeout(timer);
+          finish(src);
+        };
+        img.src = src;
+      } catch {
+        clearTimeout(timer);
+        finish(src);
+      }
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ImageUploadField({
   value,
   onChange,
@@ -149,15 +221,22 @@ export function ImageUploadField({
         onChange(uploadedUrl);
         setSuccessStatus("Imagem enviada com sucesso do computador!");
       } else {
-        // Fallback robusto: converte para Data URL Base64 para garantir funcionamento mesmo se o storage estiver offline
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === "string") {
-            onChange(reader.result);
-            setSuccessStatus("Imagem carregada do computador!");
-          }
-        };
-        reader.readAsDataURL(file);
+        // Fallback robusto e otimizado: redimensiona e comprime via canvas (máx 600px)
+        // para garantir leveza, evitar estouro de localStorage e alta performance no mobile
+        try {
+          const compressed = await compressImageFile(file, 600, 0.85);
+          onChange(compressed);
+          setSuccessStatus("Imagem otimizada e carregada do computador!");
+        } catch {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") {
+              onChange(reader.result);
+              setSuccessStatus("Imagem carregada do computador!");
+            }
+          };
+          reader.readAsDataURL(file);
+        }
       }
     } catch (err: any) {
       setUploadError(err?.message || "Erro ao processar imagem.");

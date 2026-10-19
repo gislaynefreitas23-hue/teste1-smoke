@@ -4,6 +4,7 @@ import goldenBerryImg from "@/assets/pods/golden-berry.png";
 import pineappleToastedImg from "@/assets/pods/pineapple-toasted.png";
 import tripleBerryImg from "@/assets/pods/triple-berry.png";
 import clearImg from "@/assets/pods/clear.png";
+import fckingFabImg from "@/assets/pods/fcking-fab.png";
 
 /**
  * Mapeamento exclusivo dos Pods EBCREATE BC Pro 40K para suas versões derivadas
@@ -17,6 +18,7 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
   "9739d60d-33e4-4540-8d0b-2bdeda2cae86": pineappleToastedImg,
   "1eeb97e8-5f52-48a4-9847-cd62daf9b37f": tripleBerryImg,
   "566e06a8-2051-40f7-90df-70b0a275a1ad": clearImg,
+  "9c924bf4-e909-470a-b4f2-3038cab03dd7": fckingFabImg,
 
   // Por nome de arquivo do Supabase Storage
   "catalog-1792350992493-3eqo0x.png": auroraBerriesImg,
@@ -34,6 +36,10 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
   "toasted-pineapple": pineappleToastedImg,
   "triple-berry": tripleBerryImg,
   "clear": clearImg,
+  "fcking-fab": fckingFabImg,
+  "f-cking-fab": fckingFabImg,
+  "f*cking-fab": fckingFabImg,
+  "f**king-fab": fckingFabImg,
 };
 
 export const ORIGINAL_SEEDED_STORAGE_FILES: Record<string, string> = {
@@ -52,6 +58,7 @@ const LOCAL_POD_ASSETS = [
   pineappleToastedImg,
   tripleBerryImg,
   clearImg,
+  fckingFabImg,
 ];
 
 /**
@@ -161,12 +168,16 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
           return;
         }
 
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
+        const naturalWidth = img.naturalWidth || img.width;
+        const naturalHeight = img.naturalHeight || img.height;
+        const maxDim = 480;
+        const scale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight));
+        const width = Math.max(1, Math.round(naturalWidth * scale));
+        const height = Math.max(1, Math.round(naturalHeight * scale));
         canvas.width = width;
         canvas.height = height;
 
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, width, height);
         const imgData = ctx.getImageData(0, 0, width, height);
         const data = imgData.data;
 
@@ -242,25 +253,38 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
         }
 
         let head = 0;
-        while (head < queue.length) {
+        const maxIterations = 150000;
+        while (head < queue.length && head < maxIterations) {
           const pos = queue[head++];
           const cx = pos % width;
-          const cy = Math.floor(pos / width);
+          const cy = (pos / width) | 0;
 
-          const neighbors = [
-            [cx - 1, cy],
-            [cx + 1, cy],
-            [cx, cy - 1],
-            [cx, cy + 1],
-          ];
-
-          for (const [nx, ny] of neighbors) {
-            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-              const npos = ny * width + nx;
-              if (!visited[npos] && isPixelWhite(nx, ny)) {
-                visited[npos] = 1;
-                queue.push(npos);
-              }
+          if (cx > 0) {
+            const npos = cy * width + (cx - 1);
+            if (!visited[npos] && isPixelWhite(cx - 1, cy)) {
+              visited[npos] = 1;
+              queue.push(npos);
+            }
+          }
+          if (cx < width - 1) {
+            const npos = cy * width + (cx + 1);
+            if (!visited[npos] && isPixelWhite(cx + 1, cy)) {
+              visited[npos] = 1;
+              queue.push(npos);
+            }
+          }
+          if (cy > 0) {
+            const npos = (cy - 1) * width + cx;
+            if (!visited[npos] && isPixelWhite(cx, cy - 1)) {
+              visited[npos] = 1;
+              queue.push(npos);
+            }
+          }
+          if (cy < height - 1) {
+            const npos = (cy + 1) * width + cx;
+            if (!visited[npos] && isPixelWhite(cx, cy + 1)) {
+              visited[npos] = 1;
+              queue.push(npos);
             }
           }
         }

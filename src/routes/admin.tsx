@@ -783,7 +783,7 @@ function MasterAdminApp({
           {activeSection === "cidades" && <CitiesCommercialSection />}
 
           {activeSection === "personalizar" && (
-            <CustomizeSiteSection settings={settings} onSaveSettings={saveSettings} />
+            <CustomizeSiteSection settings={settings} onSaveSettings={saveSettings} products={rawProducts} />
           )}
 
           {activeSection === "clientes" && <CustomersCashbackSection orders={orders} />}
@@ -2205,9 +2205,11 @@ function CitiesCommercialSection() {
 function CustomizeSiteSection({
   settings,
   onSaveSettings,
+  products = [],
 }: {
   settings: StoreSettings;
   onSaveSettings: (settings: StoreSettings) => Promise<void>;
+  products?: any[];
 }) {
   const [formData, setFormData] = useState<StoreSettings>(settings);
   const [editingSlide, setEditingSlide] = useState<BannerSlide | null>(null);
@@ -2241,6 +2243,17 @@ function CustomizeSiteSection({
     const updated = formData.banners.map((b) => (b.id === slideId ? { ...b, active: !b.active } : b));
     setFormData({ ...formData, banners: updated });
     await onSaveSettings({ ...formData, banners: updated });
+  }
+
+  async function handleMoveSlide(index: number, direction: "up" | "down") {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= formData.banners.length) return;
+    const updated = [...formData.banners];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(targetIndex, 0, moved);
+    const reordered = updated.map((b, i) => ({ ...b, order: i + 1 }));
+    setFormData({ ...formData, banners: reordered });
+    await onSaveSettings({ ...formData, banners: reordered });
   }
 
   async function handleSaveSlide(e: React.FormEvent) {
@@ -2337,6 +2350,41 @@ function CustomizeSiteSection({
         {editingSlide && (
           <div className="rounded-xl border border-primary/40 bg-slate-950 p-4 space-y-3">
             <h4 className="text-xs font-bold text-white">Editar Slide do Carrossel</h4>
+
+            <div>
+              <Label className="text-[11px] font-semibold text-slate-200">
+                Vincular a Produto do Catálogo (Opcional)
+              </Label>
+              <select
+                value={editingSlide.productId || ""}
+                onChange={(e) => {
+                  const pId = e.target.value;
+                  const found = products.find((p) => p.id === pId);
+                  if (found) {
+                    const cleanName = (found.name || "").replace(/^EBCREATE BC Pro 40K\s*[-–]\s*/i, "").trim();
+                    setEditingSlide({
+                      ...editingSlide,
+                      productId: pId,
+                      title: editingSlide.title && editingSlide.title !== "Novo Pod Descartável" ? editingSlide.title : cleanName,
+                      flavorDesc: editingSlide.flavorDesc || found.flavor_profile || found.description || "",
+                    });
+                  } else {
+                    setEditingSlide({ ...editingSlide, productId: "" });
+                  }
+                }}
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Nenhum (ou usar correspondência automática por título)</option>
+                {products
+                  .filter((p) => p.category !== "_system_settings")
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.category})
+                    </option>
+                  ))}
+              </select>
+            </div>
+
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
                 <Label className="text-[11px]">Badge / Selo</Label>
@@ -2438,13 +2486,39 @@ function CustomizeSiteSection({
               <p className="text-[11px] text-slate-300 line-clamp-2 italic bg-slate-900/80 p-2 rounded border border-slate-800/60">
                 {b.flavorDesc || b.description || "Sem descrição informada"}
               </p>
-              <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-800/80">
-                <Button size="sm" variant="ghost" onClick={() => setEditingSlide(b)} className="h-7 text-xs text-primary">
-                  Editar
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => handleDeleteSlide(b.id)} className="h-7 text-xs text-rose-400">
-                  Excluir
-                </Button>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={idx === 0}
+                    onClick={() => handleMoveSlide(idx, "up")}
+                    className="h-6 w-6 p-0 text-slate-400 hover:text-white disabled:opacity-30"
+                    title="Mover para cima"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={idx === formData.banners.length - 1}
+                    onClick={() => handleMoveSlide(idx, "down")}
+                    className="h-6 w-6 p-0 text-slate-400 hover:text-white disabled:opacity-30"
+                    title="Mover para baixo"
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </Button>
+                </div>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => setEditingSlide(b)} className="h-7 text-xs text-primary">
+                    Editar
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDeleteSlide(b.id)} className="h-7 text-xs text-rose-400">
+                    Excluir
+                  </Button>
+                </div>
               </div>
             </div>
           ))}

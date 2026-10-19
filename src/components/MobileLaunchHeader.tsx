@@ -32,13 +32,16 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
     return null;
   }
 
-  const activeBanners = settings.banners.filter((b) => b.active);
+  const activeBanners = settings.banners
+    .filter((b) => b.active)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
   const slides: SlideItem[] =
     activeBanners.length > 0
       ? activeBanners.map((b, idx) => {
           const cleanTitle = (b.title || "").trim();
           const shortTitle = cleanTitle.replace(/^EBCREATE BC Pro 40K\s*[-–]\s*/i, "").trim();
-          const matchedProdId = POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
+          const matchedProdId = b.productId || POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
 
           return {
             id: idx + 1,
@@ -66,6 +69,12 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
       : SLIDES;
 
   const totalSlides = slides.length;
+
+  useEffect(() => {
+    if (current >= totalSlides && totalSlides > 0) {
+      setCurrent(0);
+    }
+  }, [totalSlides, current]);
 
   const nextSlide = useCallback(() => {
     setCurrent((prev) => (prev + 1) % totalSlides);

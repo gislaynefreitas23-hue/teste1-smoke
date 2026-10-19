@@ -15,6 +15,7 @@ export interface BannerSlide {
   imageUrl: string;
   active: boolean;
   order: number;
+  productId?: string;
 }
 
 export interface StoreSettings {
@@ -170,6 +171,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     "9739d60d-33e4-4540-8d0b-2bdeda2cae86": "lancamento",
     "1eeb97e8-5f52-48a4-9847-cd62daf9b37f": "lancamento",
     "566e06a8-2051-40f7-90df-70b0a275a1ad": "lancamento",
+    "9c924bf4-e909-470a-b4f2-3038cab03dd7": "lancamento",
   },
   productPromoPrices: {},
   productOrder: [
@@ -238,9 +240,25 @@ export function saveStoreSettingsLocally(settings: StoreSettings) {
   try {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     localStorage.setItem(LAST_SAVED_KEY, String(Date.now()));
-    window.dispatchEvent(new CustomEvent(SETTINGS_EVENT_NAME, { detail: settings }));
   } catch (err) {
     console.error("Erro ao salvar configurações localmente:", err);
+    try {
+      // Se estourar a cota de localStorage por imagens base64, salva versão limpa no cache local
+      const stripped = {
+        ...settings,
+        banners: settings.banners?.map((b) => ({
+          ...b,
+          imageUrl: b.imageUrl?.startsWith("data:") && b.imageUrl.length > 50000 ? "" : b.imageUrl,
+        })),
+      };
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(stripped));
+      localStorage.setItem(LAST_SAVED_KEY, String(Date.now()));
+    } catch {
+      // ignore
+    }
+  } finally {
+    // SEMPRE dispara o evento reativo para que toda a interface em tela atualize instantaneamente!
+    window.dispatchEvent(new CustomEvent(SETTINGS_EVENT_NAME, { detail: settings }));
   }
 }
 
@@ -370,7 +388,7 @@ export async function saveStoreSettings(settings: StoreSettings): Promise<void> 
 
     await Promise.race([
       syncRemote(),
-      new Promise((resolve) => setTimeout(resolve, 1500)),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
     ]);
   } catch {
     // Fallback silencioso

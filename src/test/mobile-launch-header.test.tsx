@@ -89,4 +89,49 @@ describe("MobileLaunchHeader: Produtos de Lançamento como Cabeçalho no Mobile"
     expect(mobileHeader).toBeInTheDocument();
     expect(mobileHeader?.className).toContain("md:hidden");
   });
+
+  it("4. Exibe novo slide adicionado pelo painel da loja com total de slides atualizado e link direto do produto", () => {
+    const customSettings = {
+      banners: [
+        {
+          id: "slide-1",
+          badge: "LANÇAMENTO",
+          title: "Aurora Berries",
+          puffs: "40.000 PUFFS",
+          footerPhrase: "Alta Performance",
+          imageUrl: "",
+          active: true,
+          order: 1,
+        },
+        {
+          id: "slide-new",
+          badge: "LANÇAMENTO",
+          title: "F*cking Fab",
+          puffs: "40.000 PUFFS",
+          footerPhrase: "Conecte-se à sua vibe",
+          imageUrl: "",
+          active: true,
+          order: 2,
+          productId: "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+        },
+      ],
+    };
+    localStorage.setItem("pantanal_store_settings", JSON.stringify(customSettings));
+
+    render(<MobileLaunchHeader />);
+
+    // Contador deve exibir total de 2 slides
+    expect(screen.getByText("01/02")).toBeInTheDocument();
+
+    // Avança para o slide adicionado pelo painel
+    act(() => {
+      vi.advanceTimersByTime(4500);
+    });
+
+    expect(screen.getByText("F*cking Fab")).toBeInTheDocument();
+    expect(screen.getByText("02/02")).toBeInTheDocument();
+
+    const link = screen.getByRole("region", { name: /lançamentos no cabeçalho/i }).querySelector("a");
+    expect(link).toHaveAttribute("href", "/produtos/9c924bf4-e909-470a-b4f2-3038cab03dd7");
+  });
 });
