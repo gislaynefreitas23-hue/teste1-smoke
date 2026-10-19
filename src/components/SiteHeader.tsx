@@ -25,6 +25,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { MobileLaunchHeader } from "@/components/MobileLaunchHeader";
 
 export function SiteHeader() {
   const { count } = useCart();
@@ -289,6 +290,9 @@ export function SiteHeader() {
           </Sheet>
         </div>
       </div>
+
+      {/* Faixa de Cabeçalho Mobile: Produtos de Lançamento (aparece como cabeçalho no celular) */}
+      <MobileLaunchHeader />
     </header>
   );
 }

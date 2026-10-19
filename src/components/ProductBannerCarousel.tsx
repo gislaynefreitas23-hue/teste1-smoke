@@ -9,7 +9,7 @@ import { useStoreSettings } from "@/lib/store-settings";
 
 import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 
-const POD_PRODUCT_IDS: Record<string, string> = {
+export const POD_PRODUCT_IDS: Record<string, string> = {
   "Aurora Berries": "055e851d-e131-41c4-bbb5-6e358c2e719b",
   "Pink Lemonade": "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
   "Toasted Pineapple": "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
@@ -19,7 +19,7 @@ const POD_PRODUCT_IDS: Record<string, string> = {
   "Clear": "566e06a8-2051-40f7-90df-70b0a275a1ad",
 };
 
-function CarouselSlideImage({
+export function CarouselSlideImage({
   imageUrl,
   alt,
   isEager,
@@ -71,7 +71,7 @@ function CarouselSlideImage({
   );
 }
 
-type SlideItem = {
+export type SlideItem = {
   id: number;
   productId?: string;
   name: string;
@@ -84,7 +84,7 @@ type SlideItem = {
   glowColor: string;
 };
 
-const SLIDES: SlideItem[] = [
+export const SLIDES: SlideItem[] = [
   {
     id: 1,
     name: "Aurora Berries",

@@ -71,8 +71,8 @@ function Home() {
         </div>
       </section>
 
-      {/* Carrossel de Banners com Destaques e Lançamentos - Versão compacta para não roubar espaço da seleção de cidade */}
-      <ProductBannerCarousel compact={true} />
+      {/* Carrossel de Banners com Destaques e Lançamentos - No desktop fica compacto; no mobile aparece como cabeçalho */}
+      <ProductBannerCarousel compact={true} className="hidden md:block" />
 
       {/* Seção de Seleção de Cidade na entrada da loja */}
       <CitySection />
