@@ -157,4 +157,23 @@ describe("ProductBannerCarousel", () => {
       screen.getByText("Transparência Pura e Máxima Autonomia")
     ).toBeInTheDocument();
   });
+
+  it("renders responsive action button with 'Conheça o lançamento' for desktop and 'Conferir novidade' for mobile", () => {
+    const { container } = render(<ProductBannerCarousel />);
+
+    // Deve conter ambos os textos nos spans com classes responsivas apropriadas
+    const desktopSpan = screen.getAllByText("Conheça o lançamento")[0];
+    expect(desktopSpan).toBeInTheDocument();
+    expect(desktopSpan.className).toContain("hidden md:inline");
+
+    const mobileSpan = screen.getAllByText("Conferir novidade")[0];
+    expect(mobileSpan).toBeInTheDocument();
+    expect(mobileSpan.className).toContain("inline md:hidden");
+
+    // O botão principal deve conter classes anti-quebra e de ajuste responsivo
+    const actionButton = desktopSpan.closest("a");
+    expect(actionButton).toBeInTheDocument();
+    expect(actionButton?.className).toContain("whitespace-nowrap");
+    expect(actionButton?.className).toContain("w-fit");
+  });
 });

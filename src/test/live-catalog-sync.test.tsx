@@ -48,7 +48,9 @@ describe("Live Catalog Sync & Real-time Site Updates", () => {
     // Deve exibir o slide ativo inicial com o nome e puffs
     expect(screen.getByText("Aurora Berries")).toBeInTheDocument();
     expect(screen.getAllByText("40.000 PUFFS").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/Ver Detalhes & Pedir/i).length).toBeGreaterThanOrEqual(1);
+    expect(
+      screen.getAllByText(/Conheça o lançamento|Conferir novidade/i).length
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it("3. Formata corretamente preços atualizados em R$ 89,90", () => {

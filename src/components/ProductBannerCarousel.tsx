@@ -394,15 +394,17 @@ export function ProductBannerCarousel({
                     <div className={compact ? "pt-1 flex items-center gap-2" : "pt-2 flex items-center gap-3"}>
                       <a
                         href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
-                        className={`inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,85,247,0.5)] cursor-pointer ${
+                        aria-label={`Conheça o lançamento ${slide.name}`}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,85,247,0.5)] cursor-pointer whitespace-nowrap w-fit max-w-full ${
                           compact
                             ? "px-3 py-1 text-[11px]"
-                            : "px-4 py-2 text-xs"
+                            : "px-3.5 py-2 text-xs sm:px-5 sm:py-2.5 sm:text-sm md:px-6 md:py-2.5"
                         }`}
                       >
-                        <Sparkles className="h-3 w-3 text-amber-300" />
-                        Ver Detalhes & Pedir
-                        <ArrowRight className="h-3 w-3" />
+                        <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+                        <span className="inline md:hidden">Conferir novidade</span>
+                        <span className="hidden md:inline">Conheça o lançamento</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
                       </a>
                     </div>
                   </div>
