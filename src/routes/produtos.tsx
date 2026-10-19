@@ -40,11 +40,11 @@ function Produtos() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo(() => {
-    const set = new Set(products.map((p) => p.category));
+    const set = new Set(products.map((p) => p.category).filter(Boolean));
     const sortedCategories = Array.from(set).sort((a, b) => {
-      if (a.toLowerCase().includes("pod")) return -1;
-      if (b.toLowerCase().includes("pod")) return 1;
-      return a.localeCompare(b);
+      if ((a || "").toLowerCase().includes("pod")) return -1;
+      if ((b || "").toLowerCase().includes("pod")) return 1;
+      return (a || "").localeCompare(b || "");
     });
     return ["Todos", ...sortedCategories];
   }, [products]);
@@ -54,9 +54,9 @@ function Produtos() {
       const matchCategory = category === "Todos" || p.category === category;
       const matchSearch =
         !searchQuery.trim() ||
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.flavor_profile.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase());
+        (p.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.flavor_profile || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
       return matchCategory && matchSearch;
     });
   }, [products, category, searchQuery]);
@@ -135,7 +135,7 @@ function Produtos() {
           </div>
         </div>
 
-        {isLoading ? (
+        {isLoading && products.length === 0 ? (
           <p className="mt-10 text-slate-700 font-medium text-center">Carregando catálogo da sua cidade...</p>
         ) : visible.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-slate-300/80 bg-white/60 p-10 text-center shadow-xs">
