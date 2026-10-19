@@ -145,6 +145,34 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  // Após uma nova publicação, arquivos antigos somem: recarrega a página uma vez para buscar a versão nova.
+  useEffect(() => {
+    const KEY = "chunk-reload-at";
+    const reloadOnce = () => {
+      const last = Number(sessionStorage.getItem(KEY) || 0);
+      if (Date.now() - last < 10000) return;
+      sessionStorage.setItem(KEY, String(Date.now()));
+      window.location.reload();
+    };
+    const onPreload = (e: Event) => {
+      e.preventDefault();
+      reloadOnce();
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const msg = String(e.reason?.message || e.reason || "");
+      if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(msg)) {
+        e.preventDefault();
+        reloadOnce();
+      }
+    };
+    window.addEventListener("vite:preloadError", onPreload);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("vite:preloadError", onPreload);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   // Remove permanentemente qualquer botão, selo ou elemento do Lovable que possa ser injetado no DOM
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return;
