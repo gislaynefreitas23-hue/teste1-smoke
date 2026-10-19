@@ -10,6 +10,8 @@ export interface BannerSlide {
   title: string;
   puffs: string;
   footerPhrase: string;
+  flavorDesc?: string;
+  description?: string;
   imageUrl: string;
   active: boolean;
   order: number;
@@ -130,6 +132,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Aurora Berries",
       puffs: "40.000 PUFFS",
       footerPhrase: "Consistência de Sabor de Alta Performance",
+      flavorDesc:
+        "Fusão equilibrada de amoras silvestres e framboesas com toque refrescante de menta gelada e vapor denso.",
       imageUrl: auroraImg,
       active: true,
       order: 1,
@@ -140,6 +144,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Pink Lemonade",
       puffs: "40.000 PUFFS",
       footerPhrase: "Gerenciamento de Potência e Autonomia Estendida",
+      flavorDesc:
+        "Notas cítricas marcantes de limão siciliano harmonizadas com frutas vermelhas selecionadas e vapor suave.",
       imageUrl: pinkLemonadeImg,
       active: true,
       order: 2,
@@ -150,6 +156,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       title: "Toasted Pineapple",
       puffs: "40.000 PUFFS",
       footerPhrase: "Design Funcional com Visibilidade de Essência",
+      flavorDesc:
+        "Perfil tropical exclusivo com nuances doces e tostadas de abacaxi maduro, proporcionando sabor encorpado.",
       imageUrl: toastedPineappleImg,
       active: true,
       order: 3,
@@ -194,7 +202,14 @@ export function getStoreSettings(): StoreSettings {
       ...parsed,
       banners:
         Array.isArray(parsed.banners) && parsed.banners.length > 0
-          ? parsed.banners
+          ? parsed.banners.map((b: any, idx: number) => ({
+              ...b,
+              flavorDesc:
+                b.flavorDesc ??
+                b.description ??
+                DEFAULT_STORE_SETTINGS.banners[idx]?.flavorDesc ??
+                "",
+            }))
           : DEFAULT_STORE_SETTINGS.banners,
       productBadges:
         parsed.productBadges && Object.keys(parsed.productBadges).length > 0
@@ -304,51 +319,61 @@ export async function fetchRemoteStoreSettings(): Promise<StoreSettings | null> 
 export async function saveStoreSettings(settings: StoreSettings): Promise<void> {
   saveStoreSettingsLocally(settings);
 
-  // 1. Tenta persistir na tabela store_settings se existir
+  // Sincronização com Supabase (com timeout defensivo para garantir alta disponibilidade mesmo offline)
   try {
-    const table = (supabase as any).from("store_settings");
-    if (typeof table?.upsert === "function") {
-      const { error: dedicatedError } = await table.upsert({
-        key: "general",
-        value: settings,
-        updated_at: new Date().toISOString(),
-      });
-      if (!dedicatedError) return;
-    }
-  } catch {
-    // continua para fallback
-  }
+    const syncRemote = async () => {
+      try {
+        const table = (supabase as any).from("store_settings");
+        if (typeof table?.upsert === "function") {
+          const { error: dedicatedError } = await table.upsert({
+            key: "general",
+            value: settings,
+            updated_at: new Date().toISOString(),
+          });
+          if (!dedicatedError) return;
+        }
+      } catch {
+        // continua para fallback
+      }
 
-  // 2. Persiste com segurança na tabela products na linha reservada de sistema
-  try {
-    const selectQuery = supabase.from("products").select("id");
-    let existingRow: { id: string } | null = null;
+      try {
+        const selectQuery = supabase.from("products").select("id");
+        let existingRow: { id: string } | null = null;
 
-    if (typeof (selectQuery as any)?.eq === "function") {
-      const { data } = await (selectQuery as any)
-        .eq("category", SYSTEM_SETTINGS_CATEGORY)
-        .maybeSingle();
-      existingRow = data;
-    }
+        if (typeof (selectQuery as any)?.eq === "function") {
+          const { data } = await (selectQuery as any)
+            .eq("category", SYSTEM_SETTINGS_CATEGORY)
+            .maybeSingle();
+          existingRow = data;
+        }
 
-    const payload = {
-      name: "Configurações Globais Pantanal Smoke",
-      category: SYSTEM_SETTINGS_CATEGORY,
-      description: JSON.stringify(settings),
-      price: 0,
-      active: true,
-      image_url: "",
-      flavor_profile: "system",
-      intensity: "system",
+        const payload = {
+          name: "Configurações Globais Pantanal Smoke",
+          category: SYSTEM_SETTINGS_CATEGORY,
+          description: JSON.stringify(settings),
+          price: 0,
+          active: true,
+          image_url: "",
+          flavor_profile: "system",
+          intensity: "system",
+        };
+
+        if (existingRow?.id) {
+          await supabase.from("products").update(payload).eq("id", existingRow.id);
+        } else {
+          await supabase.from("products").insert(payload);
+        }
+      } catch {
+        // Fallback silencioso
+      }
     };
 
-    if (existingRow?.id) {
-      await supabase.from("products").update(payload).eq("id", existingRow.id);
-    } else {
-      await supabase.from("products").insert(payload);
-    }
+    await Promise.race([
+      syncRemote(),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
   } catch {
-    // Fallback silencioso caso ambiente offline ou mock restrito
+    // Fallback silencioso
   }
 }
 

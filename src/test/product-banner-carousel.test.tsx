@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 
 import { ProductBannerCarousel } from "@/components/ProductBannerCarousel";
+import { DEFAULT_STORE_SETTINGS } from "@/lib/store-settings";
 
 describe("ProductBannerCarousel", () => {
   beforeEach(() => {
@@ -10,6 +11,7 @@ describe("ProductBannerCarousel", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    localStorage.clear();
   });
 
   it("renders initial slide 1 with correct title, 40.000 PUFFS, LANÇAMENTO badge and footer phrase", () => {
@@ -124,5 +126,35 @@ describe("ProductBannerCarousel", () => {
       // Should now advance to slide 2
       expect(screen.getByText("02 / 03")).toBeInTheDocument();
     }
+  });
+
+  it("renders custom product description (flavorDesc) edited in store settings", () => {
+    const customSettings = {
+      ...DEFAULT_STORE_SETTINGS,
+      banners: [
+        {
+          id: "custom-slide-1",
+          badge: "LANÇAMENTO",
+          title: "Clear Pro 40K",
+          puffs: "40.000 PUFFS",
+          footerPhrase: "Transparência Pura e Máxima Autonomia",
+          flavorDesc: "Sabor mentolado cristalino com vapor ultra denso e suavidade prolongada.",
+          imageUrl: "",
+          active: true,
+          order: 1,
+        },
+      ],
+    };
+    localStorage.setItem("pantanal_store_settings", JSON.stringify(customSettings));
+
+    render(<ProductBannerCarousel />);
+
+    expect(screen.getByText("Clear Pro 40K")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sabor mentolado cristalino com vapor ultra denso e suavidade prolongada.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Transparência Pura e Máxima Autonomia")
+    ).toBeInTheDocument();
   });
 });

@@ -49,6 +49,8 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
             subtitle: "Série Especial Turbo",
             footerPhrase: b.footerPhrase || "Alta Performance",
             flavorDesc:
+              b.flavorDesc ||
+              b.description ||
               SLIDES[idx % SLIDES.length]?.flavorDesc ||
               "Perfil refinado e vapor denso de alta durabilidade.",
             features:

@@ -153,6 +153,8 @@ export function ProductBannerCarousel({
             subtitle: "Série Especial Turbo",
             footerPhrase: b.footerPhrase,
             flavorDesc:
+              b.flavorDesc ||
+              b.description ||
               SLIDES[idx % SLIDES.length]?.flavorDesc ||
               "Perfil refinado e vapor denso de alta durabilidade.",
             features:

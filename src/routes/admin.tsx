@@ -2317,10 +2317,11 @@ function CustomizeSiteSection({
             onClick={() =>
               setEditingSlide({
                 id: `slide-${Date.now()}`,
-                badge: "🔥 LANÇAMENTO EXCLUSIVO",
+                badge: "LANÇAMENTO",
                 title: "Novo Pod Descartável",
-                puffs: "8000 PUFFS",
-                footerPhrase: "Conecte-se à sua vibe",
+                puffs: "40.000 PUFFS",
+                footerPhrase: "Consistência de Sabor de Alta Performance",
+                flavorDesc: "Fusão marcante de essências selecionadas com vapor denso e refrescante.",
                 imageUrl: "",
                 active: true,
                 order: formData.banners.length + 1,
@@ -2346,7 +2347,7 @@ function CustomizeSiteSection({
                 />
               </div>
               <div>
-                <Label className="text-[11px]">Título</Label>
+                <Label className="text-[11px]">Título do Produto</Label>
                 <Input
                   value={editingSlide.title}
                   onChange={(e) => setEditingSlide({ ...editingSlide, title: e.target.value })}
@@ -2361,6 +2362,45 @@ function CustomizeSiteSection({
                   className="mt-1 text-xs"
                 />
               </div>
+            </div>
+
+            <div>
+              <Label className="text-[11px] font-semibold text-slate-200">
+                Descrição do Produto / Perfil de Sabor
+              </Label>
+              <Textarea
+                value={editingSlide.flavorDesc || editingSlide.description || ""}
+                onChange={(e) =>
+                  setEditingSlide({
+                    ...editingSlide,
+                    flavorDesc: e.target.value,
+                    description: e.target.value,
+                  })
+                }
+                placeholder="Descreva as notas de sabor, perfil aromático e diferenciais deste produto no slide..."
+                className="mt-1 text-xs resize-none"
+                rows={3}
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Texto descritivo exibido diretamente abaixo do nome do produto no slide da página inicial.
+              </p>
+            </div>
+
+            <div>
+              <Label className="text-[11px] font-semibold text-slate-200">
+                Frase de Destaque / Rodapé
+              </Label>
+              <Input
+                value={editingSlide.footerPhrase || ""}
+                onChange={(e) =>
+                  setEditingSlide({ ...editingSlide, footerPhrase: e.target.value })
+                }
+                placeholder="Ex: Consistência de Sabor de Alta Performance"
+                className="mt-1 text-xs"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Frase sincronizada exibida na base do carrossel para este slide.
+              </p>
             </div>
 
             <div>
@@ -2391,7 +2431,13 @@ function CustomizeSiteSection({
                 <Switch checked={b.active} onCheckedChange={() => handleToggleBanner(b.id)} />
               </div>
               <h5 className="font-bold text-white truncate">{b.title}</h5>
-              <p className="text-[11px] text-slate-400">{b.puffs}</p>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <span className="text-purple-400 font-semibold">{b.puffs}</span>
+                {b.footerPhrase && <span className="truncate">• {b.footerPhrase}</span>}
+              </div>
+              <p className="text-[11px] text-slate-300 line-clamp-2 italic bg-slate-900/80 p-2 rounded border border-slate-800/60">
+                {b.flavorDesc || b.description || "Sem descrição informada"}
+              </p>
               <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-800/80">
                 <Button size="sm" variant="ghost" onClick={() => setEditingSlide(b)} className="h-7 text-xs text-primary">
                   Editar
