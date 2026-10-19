@@ -142,7 +142,7 @@ function Produtos() {
             <p className="text-slate-700 font-medium">Nenhum produto encontrado nesta busca para esta cidade.</p>
           </div>
         ) : (
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8 grid grid-cols-2 gap-2.5 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {visible.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
