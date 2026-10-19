@@ -534,6 +534,15 @@ function CheckoutPage() {
         session?.user?.id
       );
 
+      // Sincroniza o nome no perfil do cliente cadastrado
+      if (session?.user?.id && name.trim()) {
+        supabase
+          .from("profiles")
+          .update({ name: name.trim(), updated_at: new Date().toISOString() })
+          .eq("id", session.user.id)
+          .then(undefined, () => {});
+      }
+
       // Salva endereço para compras futuras caso o cliente tenha optado
       if (saveAddressForFuture) {
         if (session?.user?.id) {

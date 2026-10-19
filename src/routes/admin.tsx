@@ -801,6 +801,17 @@ function MasterAdminApp({
   );
 }
 
+export function resolveCustomerName(customerName?: string | null, phone?: string | null): string {
+  const clean = String(customerName || "").trim();
+  if (clean && clean.toLowerCase() !== "cliente pantanal") {
+    return clean;
+  }
+  if (phone) {
+    return `Cliente (${phone})`;
+  }
+  return "Cliente sem nome informado";
+}
+
 // ==========================================
 // SEÇÃO 1: DASHBOARD EXECUTIVO COM DADOS REAIS
 // ==========================================
@@ -961,7 +972,7 @@ function AdminDashboardSection({
                 <div key={o.id} className="py-3 flex items-center justify-between gap-3 text-xs">
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-white">{o.customer_name || "Cliente Pantanal"}</span>
+                      <span className="font-bold text-white">{resolveCustomerName(o.customer_name, o.phone)}</span>
                       <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
                         {o.city_id === "sao-paulo" ? "SP" : "Cuiabá"}
                       </span>
@@ -1216,7 +1227,7 @@ function OrdersManagementSection({ orders }: { orders: any[] }) {
                     </span>
 
                     <div>
-                      <h3 className="font-bold text-white text-base">{o.customer_name || "Cliente Pantanal"}</h3>
+                      <h3 className="font-bold text-white text-base">{resolveCustomerName(o.customer_name, o.phone)}</h3>
                       <p className="text-[11px] text-slate-400">
                         Protocolo #{String(o.id).slice(0, 8)} · {new Date(o.created_at).toLocaleString("pt-BR")}
                       </p>
@@ -2567,6 +2578,43 @@ function CustomersCashbackSection({ orders }: { orders: any[] }) {
     return orders.reduce((sum, o) => sum + (Number(o.cashback_used) || 0), 0);
   }, [orders]);
 
+  // Mapeia os dados reais mais recentes de pedidos de cada cliente autenticado
+  const customerDataFromOrders = useMemo(() => {
+    const map: Record<string, { name?: string; phone?: string; ordersCount: number }> = {};
+    for (const o of orders) {
+      if (o.user_id) {
+        if (!map[o.user_id]) {
+          map[o.user_id] = { ordersCount: 0 };
+        }
+        map[o.user_id].ordersCount += 1;
+
+        const cleanName = String(o.customer_name || "").trim();
+        if (cleanName && cleanName.toLowerCase() !== "cliente pantanal" && !map[o.user_id].name) {
+          map[o.user_id].name = cleanName;
+        }
+        if (o.phone && !map[o.user_id].phone) {
+          map[o.user_id].phone = String(o.phone).trim();
+        }
+      }
+    }
+    return map;
+  }, [orders]);
+
+  // Reconciliação em segundo plano: se o perfil estiver sem nome mas houver nome real no pedido, atualiza profiles
+  useEffect(() => {
+    for (const p of rawProfiles) {
+      const pName = String(p.name || "").trim();
+      const orderInfo = customerDataFromOrders[p.id];
+      if ((!pName || pName.toLowerCase() === "cliente pantanal") && orderInfo?.name) {
+        supabase
+          .from("profiles")
+          .update({ name: orderInfo.name, updated_at: new Date().toISOString() })
+          .eq("id", p.id)
+          .then(undefined, () => {});
+      }
+    }
+  }, [rawProfiles, customerDataFromOrders]);
+
   return (
     <div className="space-y-6">
       <div className="border-b border-slate-800 pb-4">
@@ -2610,17 +2658,49 @@ function CustomersCashbackSection({ orders }: { orders: any[] }) {
           <p className="text-xs text-slate-400">Nenhum cliente cadastrado no momento.</p>
         ) : (
           <div className="divide-y divide-slate-800/80">
-            {rawProfiles.map((p) => (
-              <div key={p.id} className="py-2.5 flex items-center justify-between text-xs">
-                <div>
-                  <p className="font-bold text-white">{p.name || "Cliente Pantanal"}</p>
-                  <p className="text-[11px] text-slate-500">ID: {p.id}</p>
+            {rawProfiles.map((p) => {
+              const pName = String(p.name || "").trim();
+              const orderInfo = customerDataFromOrders[p.id];
+              const realName =
+                pName && pName.toLowerCase() !== "cliente pantanal"
+                  ? pName
+                  : orderInfo?.name || "Cadastro sem nome informado";
+
+              const orderCount = orderInfo?.ordersCount || 0;
+              const phone = orderInfo?.phone;
+
+              return (
+                <div key={p.id} className="py-3 flex items-center justify-between text-xs gap-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="font-bold text-white truncate text-sm">
+                      {realName}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+                      <span>ID: {String(p.id).slice(0, 8)}...</span>
+                      {phone && (
+                        <>
+                          <span className="text-slate-600">•</span>
+                          <span>Tel: {phone}</span>
+                        </>
+                      )}
+                      {orderCount > 0 && (
+                        <>
+                          <span className="text-slate-600">•</span>
+                          <span className="text-slate-300 font-medium">
+                            {orderCount} {orderCount === 1 ? "pedido" : "pedidos"}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-emerald-400 font-bold text-[11px] bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                      Elegível a 5% de Cashback
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-emerald-400 font-bold text-[11px]">Elegível a 5% de Cashback</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

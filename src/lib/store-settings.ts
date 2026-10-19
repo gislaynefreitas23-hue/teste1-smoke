@@ -213,6 +213,8 @@ export function getStoreSettings(): StoreSettings {
 
 export const SYSTEM_SETTINGS_CATEGORY = "_system_settings";
 
+const LAST_SAVED_KEY = "pantanal_store_settings_saved_at";
+
 /**
  * Salva as configurações em cache local e emite evento para atualização imediata na tela
  */
@@ -220,6 +222,7 @@ export function saveStoreSettingsLocally(settings: StoreSettings) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    localStorage.setItem(LAST_SAVED_KEY, String(Date.now()));
     window.dispatchEvent(new CustomEvent(SETTINGS_EVENT_NAME, { detail: settings }));
   } catch (err) {
     console.error("Erro ao salvar configurações localmente:", err);
@@ -230,6 +233,14 @@ export function saveStoreSettingsLocally(settings: StoreSettings) {
  * Busca as configurações da loja salvas na nuvem (Supabase)
  */
 export async function fetchRemoteStoreSettings(): Promise<StoreSettings | null> {
+  // Evita que leitura remota desatualizada sobrescreva alterações locais recém-salvas (optimistic update)
+  if (typeof window !== "undefined") {
+    const lastSaved = Number(localStorage.getItem(LAST_SAVED_KEY) || 0);
+    if (Date.now() - lastSaved < 5000) {
+      return getStoreSettings();
+    }
+  }
+
   // 1. Tenta a tabela dedicada store_settings caso tenha sido criada
   try {
     const { data, error } = await (supabase as any)

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter, rootRouteId } from "@tanstack/react-router";
@@ -204,14 +204,18 @@ describe("Páginas Institucionais: Sobre Nós e Perguntas Frequentes", () => {
 
       const SobreNosComponent = SobreNosRoute.options.component!;
       const { unmount } = render(<SobreNosComponent />);
-      expect(screen.getByRole("heading", { name: "História Pantanal VIP", level: 1 })).toBeInTheDocument();
-      expect(screen.getByText("Pantanal Smoke — Vibe Exclusiva.")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "História Pantanal VIP", level: 1 })).toBeInTheDocument();
+        expect(screen.getByText("Pantanal Smoke — Vibe Exclusiva.")).toBeInTheDocument();
+      });
       unmount();
 
       const FaqComponent = PerguntasFrequentesRoute.options.component!;
       render(<FaqComponent />);
-      expect(screen.getByRole("heading", { name: "FAQ Customizado", level: 1 })).toBeInTheDocument();
-      expect(screen.getByText("Perguntas atualizadas pelo painel.")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "FAQ Customizado", level: 1 })).toBeInTheDocument();
+        expect(screen.getByText("Perguntas atualizadas pelo painel.")).toBeInTheDocument();
+      });
       const customQ = screen.getByRole("button", { name: /Qual o prazo de envio para Cuiabá\?/i });
       fireEvent.click(customQ);
       expect(await screen.findByText("Entregas em até 2 horas na região urbana.")).toBeInTheDocument();

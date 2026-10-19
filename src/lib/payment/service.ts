@@ -237,6 +237,17 @@ export async function processCheckout(
         payment_status: "aguardando_pagamento",
       });
     }
+
+    // Sincroniza o perfil do cliente se estiver logado
+    if (userId && payload.customer.name.trim() && payload.customer.name.trim() !== "Cliente Pantanal") {
+      try {
+        await (supabase.from("profiles") as any)
+          .update({ name: payload.customer.name.trim(), updated_at: new Date().toISOString() })
+          .eq("id", userId);
+      } catch {
+        // ignore
+      }
+    }
   } catch (dbErr) {
     console.warn("Aviso na persistência de pedidos via RPC:", dbErr);
     try {
