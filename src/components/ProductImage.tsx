@@ -64,11 +64,19 @@ export function ProductImage({
         return;
       }
 
-      // 2. Se for base64 ou blob já transparente
+      // 2. Se for base64 ou blob (upload local ou prévia), remove fundo branco se houver
       if (src.startsWith("data:") || src.startsWith("blob:")) {
-        if (active) {
-          setResolvedSrc(src);
-          setIsLoading(false);
+        try {
+          const clean = await removeWhiteBackgroundClientSide(src);
+          if (active) {
+            setResolvedSrc(clean);
+            setIsLoading(false);
+          }
+        } catch {
+          if (active) {
+            setResolvedSrc(src);
+            setIsLoading(false);
+          }
         }
         return;
       }

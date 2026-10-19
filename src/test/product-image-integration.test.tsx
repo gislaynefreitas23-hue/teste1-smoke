@@ -104,4 +104,26 @@ describe("Correção Definitiva da Exibição de Imagens — Pantanal Smoke", ()
 
     expect(screen.getByText("Essência Tradicional")).toBeInTheDocument();
   });
+
+  it("5. Permite troca de fotos no pod Clear sem sobrescrever com asset estático", () => {
+    const clearId = "566e06a8-2051-40f7-90df-70b0a275a1ad";
+    const clearName = "EBCREATE BC Pro 40K Clear";
+
+    // Quando não há nova foto (usa o seed original), deve retornar o asset transparente oficial
+    expect(
+      getTransparentPodAsset(clearId, "catalog-1792351430319-siqbc4.png", clearName)
+    ).toBeTruthy();
+
+    // Quando o usuário envia uma nova foto (data URL, storage novo ou URL externa),
+    // NÃO deve forçar o asset estático; deve retornar null para exibir a foto do usuário
+    expect(
+      getTransparentPodAsset(clearId, "data:image/jpeg;base64,novaFotoUsuario", clearName)
+    ).toBeNull();
+    expect(
+      getTransparentPodAsset(clearId, "produto-1792999999-clear-novo.png", clearName)
+    ).toBeNull();
+    expect(
+      getTransparentPodAsset(clearId, "https://storage.pantanal.com/novo-clear.webp", clearName)
+    ).toBeNull();
+  });
 });

@@ -57,9 +57,15 @@ export function ImageUploadField({
       return;
     }
 
-    // Se já for data URL base64 ou blob
+    // Se já for data URL base64 ou blob (upload direto do computador)
     if (value.startsWith("data:") || value.startsWith("blob:")) {
-      setPreviewUrl(value);
+      removeWhiteBackgroundClientSide(value)
+        .then((clean) => {
+          if (active) setPreviewUrl(clean);
+        })
+        .catch(() => {
+          if (active) setPreviewUrl(value);
+        });
       return;
     }
 

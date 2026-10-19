@@ -36,27 +36,92 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
   "clear": clearImg,
 };
 
+export const ORIGINAL_SEEDED_STORAGE_FILES: Record<string, string> = {
+  "catalog-1792350992493-3eqo0x.png": auroraBerriesImg,
+  "produto-1792213432848-3famu6.png": pinkLemonadeImg,
+  "catalog-1792351173512-sx962r.png": goldenBerryImg,
+  "produto-1792213247568-mp0v24.png": pineappleToastedImg,
+  "catalog-1792351555355-y3wcbv.png": tripleBerryImg,
+  "catalog-1792351430319-siqbc4.png": clearImg,
+};
+
+const LOCAL_POD_ASSETS = [
+  auroraBerriesImg,
+  pinkLemonadeImg,
+  goldenBerryImg,
+  pineappleToastedImg,
+  tripleBerryImg,
+  clearImg,
+];
+
 /**
- * Recupera versão com transparência já otimizada caso seja um dos Pods emblemáticos
+ * Verifica se uma URL de imagem corresponde a um upload ou seleção customizada feita pelo usuário
+ * no painel administrativo, a qual não deve ser substituída pelos assets estáticos locais.
+ */
+export function isCustomUserImage(imageUrl?: string | null): boolean {
+  if (!imageUrl || typeof imageUrl !== "string") return false;
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return false;
+
+  // Se já for data URL base64 ou blob (upload direto do computador)
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+    return true;
+  }
+
+  // Se corresponder a um dos 6 arquivos originais do catálogo inicial
+  for (const seededFile of Object.keys(ORIGINAL_SEEDED_STORAGE_FILES)) {
+    if (trimmed.includes(seededFile)) {
+      return false;
+    }
+  }
+
+  // Se for um dos assets transparentes locais importados
+  for (const localAsset of LOCAL_POD_ASSETS) {
+    if (trimmed === localAsset || (typeof localAsset === "string" && trimmed.includes(localAsset))) {
+      return false;
+    }
+  }
+
+  // Se for qualquer outra URL/arquivo (ex: produto-179..., novo arquivo no Supabase ou URL externa)
+  return true;
+}
+
+/**
+ * Recupera versão com transparência já otimizada caso seja um dos Pods emblemáticos,
+ * respeitando fotos customizadas enviadas/selecionadas pelo usuário no painel administrativo.
  */
 export function getTransparentPodAsset(
   productId?: string | null,
   imageUrl?: string | null,
   name?: string | null
 ): string | null {
-  if (productId && POD_TRANSPARENT_ASSETS[productId]) {
-    return POD_TRANSPARENT_ASSETS[productId];
+  // 1. Se o usuário definiu uma foto customizada nova, NÃO sobrepõe com asset estático
+  if (isCustomUserImage(imageUrl)) {
+    return null;
   }
 
+  // 2. Se a imagem apontar para um dos arquivos originais do seed do Supabase
   if (imageUrl) {
-    // Procura por nome de arquivo na URL
-    for (const [key, asset] of Object.entries(POD_TRANSPARENT_ASSETS)) {
-      if (imageUrl.includes(key)) {
+    for (const [seededFile, asset] of Object.entries(ORIGINAL_SEEDED_STORAGE_FILES)) {
+      if (imageUrl.includes(seededFile)) {
         return asset;
+      }
+    }
+
+    // Se for o caminho do próprio asset local
+    for (const localAsset of LOCAL_POD_ASSETS) {
+      if (imageUrl === localAsset || imageUrl.includes(localAsset)) {
+        return localAsset;
       }
     }
   }
 
+  // 3. Se não houver imagem customizada, busca pelo ID oficial do Supabase
+  if (productId && POD_TRANSPARENT_ASSETS[productId]) {
+    return POD_TRANSPARENT_ASSETS[productId];
+  }
+
+  // 4. Se não houver imagem customizada nem ID, busca pelo nome do sabor
   if (name) {
     const clean = name.toLowerCase();
     if (clean.includes("aurora")) return auroraBerriesImg;
@@ -105,27 +170,33 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
         const imgData = ctx.getImageData(0, 0, width, height);
         const data = imgData.data;
 
-        // Amostra os 4 cantos para verificar se há fundo branco sólido
-        const cornerIndices = [
-          0,
-          (width - 1) * 4,
-          (height - 1) * width * 4,
-          ((height - 1) * width + (width - 1)) * 4,
+        // Amostra múltiplos pontos nos 4 cantos para verificar se há fundo branco sólido ou off-white
+        const cornerPoints = [
+          [0, 0],
+          [2, 2],
+          [width - 1, 0],
+          [Math.max(0, width - 3), 2],
+          [0, height - 1],
+          [2, Math.max(0, height - 3)],
+          [width - 1, height - 1],
+          [Math.max(0, width - 3), Math.max(0, height - 3)],
         ];
 
         let whiteCornerCount = 0;
-        for (const idx of cornerIndices) {
+        for (const [cx, cy] of cornerPoints) {
+          const idx = (cy * width + cx) * 4;
           const r = data[idx];
           const g = data[idx + 1];
           const b = data[idx + 2];
           const a = data[idx + 3];
           const dist = Math.hypot(255 - r, 255 - g, 255 - b);
-          if (a > 200 && dist < 42) {
+          if (a > 180 && (dist < 50 || (r > 220 && g > 220 && b > 220))) {
             whiteCornerCount++;
           }
         }
 
-        // Se pelo menos 3 cantos forem brancos opacos, o arquivo possui fundo branco incorporado
+        // Se pelo menos metade das amostras dos cantos forem claras/brancas opacas,
+        // o arquivo possui fundo incorporado que deve ser removido
         if (whiteCornerCount < 3) {
           // Imagem já é transparente ou tem fundo artístico próprio: preserva original
           processedImageCache.set(imageSrc, imageSrc);
@@ -142,8 +213,10 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
           const r = data[idx];
           const g = data[idx + 1];
           const b = data[idx + 2];
+          const a = data[idx + 3];
+          if (a < 50) return true;
           const dist = Math.hypot(255 - r, 255 - g, 255 - b);
-          return dist < 42;
+          return dist < 48 || (r > 225 && g > 225 && b > 225);
         }
 
         for (let x = 0; x < width; x++) {
@@ -192,7 +265,7 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
           }
         }
 
-        // Aplica transparência suave nas bordas
+        // Aplica transparência suave nas bordas conectadas
         for (let i = 0; i < queue.length; i++) {
           const pos = queue[i];
           const idx = pos * 4;
@@ -200,12 +273,22 @@ export async function removeWhiteBackgroundClientSide(imageSrc: string): Promise
           const g = data[idx + 1];
           const b = data[idx + 2];
           const dist = Math.hypot(255 - r, 255 - g, 255 - b);
-          if (dist < 22) {
+          if (dist < 28) {
             data[idx + 3] = 0;
           } else {
-            const factor = (dist - 22) / 20;
-            data[idx + 3] = Math.round(255 * factor);
+            const factor = (dist - 28) / 22;
+            data[idx + 3] = Math.max(0, Math.min(255, Math.round(255 * factor)));
           }
+        }
+
+        // Garante que o perímetro externo de 1-2px seja totalmente transparente para eliminar qualquer linha residual
+        for (let x = 0; x < width; x++) {
+          if (visited[0 * width + x]) data[(0 * width + x) * 4 + 3] = 0;
+          if (visited[(height - 1) * width + x]) data[((height - 1) * width + x) * 4 + 3] = 0;
+        }
+        for (let y = 0; y < height; y++) {
+          if (visited[y * width + 0]) data[(y * width + 0) * 4 + 3] = 0;
+          if (visited[y * width + (width - 1)]) data[(y * width + (width - 1)) * 4 + 3] = 0;
         }
 
         ctx.putImageData(imgData, 0, 0);

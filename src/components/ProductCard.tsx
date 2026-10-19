@@ -14,7 +14,16 @@ export function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
   const { selectedCityId } = useCity();
   const [image, setImage] = useState<string | null>(() => {
-    return getTransparentPodAsset(product.id, product.image_url, product.name) || null;
+    const fastAsset = getTransparentPodAsset(product.id, product.image_url, product.name);
+    if (fastAsset) return fastAsset;
+    if (
+      product.image_url?.startsWith("data:") ||
+      product.image_url?.startsWith("blob:") ||
+      product.image_url?.startsWith("http")
+    ) {
+      return product.image_url;
+    }
+    return null;
   });
 
   const targetCity = product.city_id || selectedCityId || "cuiaba";
@@ -29,6 +38,11 @@ export function ProductCard({ product }: { product: Product }) {
     const fastAsset = getTransparentPodAsset(product.id, product.image_url, product.name);
     if (fastAsset) {
       setImage(fastAsset);
+      return;
+    }
+
+    if (!product.image_url) {
+      setImage(null);
       return;
     }
 
