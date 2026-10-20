@@ -313,7 +313,7 @@ export function ProductBannerCarousel({
                 className={`w-full shrink-0 ${
                   compact
                     ? "px-4 py-3 sm:px-6 sm:py-3.5 md:px-8 md:py-4"
-                    : "px-6 py-7 sm:px-12 sm:py-8 md:px-14 md:py-10"
+                    : "px-4 py-4 sm:px-12 sm:py-8 md:px-14 md:py-10"
                 }`}
               >
                 <div
@@ -328,7 +328,7 @@ export function ProductBannerCarousel({
                     className={`flex flex-col justify-center ${
                       compact
                         ? "space-y-1.5 sm:space-y-2 md:col-span-8"
-                        : "space-y-4 md:col-span-7 lg:col-span-8"
+                        : "space-y-2 sm:space-y-3 md:space-y-4 md:col-span-7 lg:col-span-8"
                     }`}
                   >
                     {/* Linha Superior: Selo LANÇAMENTO + Badges */}
@@ -338,7 +338,7 @@ export function ProductBannerCarousel({
                         className={`inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-[#A855F7] font-black uppercase text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] ${
                           compact
                             ? "px-2 py-0.5 text-[9px] sm:text-[10px] tracking-[0.15em]"
-                            : "px-3.5 py-1 text-[11px] sm:text-xs tracking-[0.25em]"
+                            : "px-2.5 py-0.5 text-[9.5px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wider sm:tracking-[0.25em]"
                         }`}
                       >
                         <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
@@ -350,10 +350,10 @@ export function ProductBannerCarousel({
                         className={`inline-flex items-center gap-1 rounded-full border border-purple-600/40 bg-[#25222B] font-bold text-purple-200 shadow-sm backdrop-blur-sm ${
                           compact
                             ? "px-2 py-0.5 text-[10px] sm:text-[11px] tracking-wide"
-                            : "px-3.5 py-1 text-xs tracking-wider"
+                            : "px-2.5 py-0.5 text-[10px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wide sm:tracking-wider"
                         }`}
                       >
-                        <Zap className={compact ? "h-3 w-3 text-purple-400" : "h-3.5 w-3.5 text-purple-400"} />
+                        <Zap className={compact ? "h-3 w-3 text-purple-400" : "h-3 w-3 sm:h-3.5 sm:w-3.5 text-purple-400"} />
                         {slide.puffs}
                       </span>
 
@@ -362,7 +362,7 @@ export function ProductBannerCarousel({
                         className={`items-center gap-1 rounded-full border border-slate-400/40 bg-slate-900/10 font-semibold tracking-wide text-[#34313B] ${
                           compact
                             ? "hidden sm:inline-flex px-2 py-0.5 text-[10px]"
-                            : "inline-flex px-3 py-1 text-[11px]"
+                            : "hidden sm:inline-flex px-3 py-1 text-[11px]"
                         }`}
                       >
                         <Gauge className="h-3 w-3 text-slate-600" />
@@ -376,7 +376,7 @@ export function ProductBannerCarousel({
                         className={`font-black tracking-tight text-[#221F28] ${
                           compact
                             ? "text-xl sm:text-2xl md:text-3xl leading-tight"
-                            : "text-3xl sm:text-4xl md:text-5xl"
+                            : "text-2xl sm:text-4xl md:text-5xl leading-tight"
                         }`}
                       >
                         {slide.name}
@@ -385,7 +385,7 @@ export function ProductBannerCarousel({
                         className={`font-medium text-[#4A4652] ${
                           compact
                             ? "mt-0.5 max-w-lg text-[11px] sm:text-xs line-clamp-1 sm:line-clamp-2 leading-snug"
-                            : "mt-2.5 max-w-xl text-xs sm:text-sm md:text-base leading-relaxed"
+                            : "mt-1 sm:mt-2.5 max-w-xl text-xs sm:text-sm md:text-base line-clamp-2 leading-relaxed"
                         }`}
                       >
                         {slide.flavorDesc}
@@ -394,7 +394,7 @@ export function ProductBannerCarousel({
 
                     {/* Recursos e Performance */}
                     {!compact ? (
-                      <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-medium text-[#423E4B] sm:text-xs">
+                      <div className="hidden sm:flex flex-wrap items-center gap-2 pt-1 text-[11px] font-medium text-[#423E4B] sm:text-xs">
                         {slide.features.map((feature, fIdx) => (
                           <div key={feature} className="flex items-center gap-1.5">
                             {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
@@ -418,14 +418,14 @@ export function ProductBannerCarousel({
                     )}
 
                     {/* Botão de ação direta para o produto */}
-                    <div className={compact ? "pt-1 flex items-center gap-2" : "pt-2 flex items-center gap-3"}>
+                    <div className={compact ? "pt-1 flex items-center gap-2" : "pt-1 sm:pt-2 flex items-center gap-2 sm:gap-3"}>
                       <a
                         href={slide.productId ? `/produtos/${slide.productId}` : "/produtos"}
                         aria-label={`Conheça o lançamento ${slide.name}`}
                         className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#A855F7] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,85,247,0.5)] cursor-pointer whitespace-nowrap w-fit max-w-full ${
                           compact
                             ? "px-3 py-1 text-[11px]"
-                            : "px-3.5 py-2 text-xs sm:px-5 sm:py-2.5 sm:text-sm md:px-6 md:py-2.5"
+                            : "px-3 py-1.5 text-xs sm:px-5 sm:py-2.5 sm:text-sm md:px-6 md:py-2.5"
                         }`}
                       >
                         <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-300" />
@@ -443,14 +443,14 @@ export function ProductBannerCarousel({
                       className={`group/img relative flex w-full items-center justify-center cursor-pointer ${
                         compact
                           ? "h-28 sm:h-36 md:h-40 max-w-[120px] sm:max-w-[160px]"
-                          : "h-64 sm:h-72 sm:max-w-[280px] md:h-84 max-w-[260px]"
+                          : "h-36 sm:h-72 sm:max-w-[280px] md:h-84 max-w-[190px] sm:max-w-[260px] mx-auto"
                       }`}
                       aria-label={`Ver detalhes de ${slide.name}`}
                     >
                       {/* Iluminação difusa roxa projetada atrás da imagem original do produto */}
                       <div
                         className={`pointer-events-none absolute inset-0 rounded-full opacity-40 transition-all duration-500 group-hover/img:opacity-65 ${
-                          compact ? "-m-3 blur-xl" : "-m-6 blur-2xl"
+                          compact ? "-m-3 blur-xl" : "-m-4 sm:-m-6 blur-xl sm:blur-2xl"
                         }`}
                         style={{ background: slide.glowColor }}
                         aria-hidden="true"
@@ -497,7 +497,7 @@ export function ProductBannerCarousel({
       {/* Faixa inferior (Rodapé do Banner): base sólida em grafite com frase sincronizada + indicadores */}
       <div
         className={`relative z-20 flex flex-col items-center justify-between border-t border-[#34313B]/30 bg-[#25222B]/95 backdrop-blur-md sm:flex-row ${
-          compact ? "px-4 py-2 gap-2" : "px-6 py-3.5 gap-3"
+          compact ? "px-4 py-2 gap-2" : "px-4 py-2 sm:px-6 sm:py-3.5 gap-2 sm:gap-3"
         }`}
       >
         {/* Frase sincronizada exclusivamente com o slide ativo */}

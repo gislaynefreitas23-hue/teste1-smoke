@@ -32,8 +32,13 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
     pathname = "/";
   }
 
-  // Não renderiza em páginas de checkout ou no painel admin
-  if (pathname.startsWith("/checkout") || pathname.startsWith("/admin")) {
+  // Não renderiza em páginas de checkout, no painel admin ou na página de produtos (onde o carrossel principal já é exibido)
+  if (
+    pathname.startsWith("/checkout") ||
+    pathname.startsWith("/admin") ||
+    pathname === "/produtos" ||
+    pathname === "/produtos/"
+  ) {
     return null;
   }
 

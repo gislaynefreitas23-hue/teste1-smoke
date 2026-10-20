@@ -122,10 +122,10 @@ export function ProductCard({ product }: { product: Product }) {
               loading="lazy"
               width={600}
               height={600}
-              className="relative z-10 h-full w-full object-contain p-2 sm:p-3 drop-shadow-[0_12px_24px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-105"
+              className="relative z-10 mx-auto block max-h-full max-w-full object-contain object-center p-2 sm:p-3 drop-shadow-[0_12px_24px_rgba(0,0,0,0.5)] transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="relative z-10 flex h-full w-full items-center justify-center px-2 text-center text-xs sm:text-sm text-muted-foreground">
+            <div className="relative z-10 flex h-full w-full items-center justify-center text-center px-2 text-xs sm:text-sm text-muted-foreground">
               {product.name}
             </div>
           )}
