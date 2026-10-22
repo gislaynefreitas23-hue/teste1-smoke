@@ -17,6 +17,7 @@ import { AgeGate } from "../components/AgeGate";
 import { CityDialog } from "../components/CityDialog";
 import { SiteFooter } from "../components/SiteFooter";
 import { SiteHeader } from "../components/SiteHeader";
+import { FloatingWhatsApp } from "../components/FloatingWhatsApp";
 import { CartProvider } from "../lib/cart";
 import { CityProvider } from "../lib/city";
 import { SITE_NAME } from "../lib/brasa";
@@ -287,6 +288,7 @@ function RootComponent() {
           {/* Necessário: as páginas filhas são renderizadas aqui. */}
           <Outlet />
           <SiteFooter />
+          <FloatingWhatsApp />
         </CityProvider>
       </CartProvider>
     </QueryClientProvider>
