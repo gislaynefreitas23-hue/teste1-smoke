@@ -24,6 +24,8 @@ export const POD_PRODUCT_IDS: Record<string, string> = {
   "F*cking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
   "F**king Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
   "Fcking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+  "Fucking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
+  "fucking-fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
   "Sour Apple Ice": "06d6bbb2-7bdb-41e2-a822-d6ee17f5dc56",
   "Blue Razz Ice": "e9cea634-18df-4035-a943-20b748a547fa",
 };
@@ -169,14 +171,22 @@ export function ProductBannerCarousel({
       ? activeBanners.map((b, idx) => {
           const cleanTitle = (b.title || "").trim();
           const shortTitle = cleanTitle.replace(/^EBCREATE BC Pro 40K\s*[-–]\s*/i, "").trim();
-          const matchedProdId = b.productId || POD_PRODUCT_IDS[cleanTitle] || POD_PRODUCT_IDS[shortTitle];
+          const matchedProdId =
+            b.productId ||
+            POD_PRODUCT_IDS[cleanTitle] ||
+            POD_PRODUCT_IDS[shortTitle] ||
+            (cleanTitle.toLowerCase().includes("fab") ? "9c924bf4-e909-470a-b4f2-3038cab03dd7" : undefined);
+
+          const fallbackImage =
+            getTransparentPodAsset(matchedProdId, null, b.title) ||
+            (SLIDES[idx]?.name.toLowerCase() === cleanTitle.toLowerCase() ? SLIDES[idx]?.image : "");
 
           return {
             id: idx + 1,
             productId: matchedProdId,
             name: b.title,
             puffs: b.puffs,
-            image: b.imageUrl || SLIDES[idx % SLIDES.length]?.image || imgAurora,
+            image: b.imageUrl || fallbackImage || "",
             subtitle: "Série Especial Turbo",
             footerPhrase: b.footerPhrase,
             flavorDesc:

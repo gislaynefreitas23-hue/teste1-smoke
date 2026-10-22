@@ -40,6 +40,9 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
   "f-cking-fab": fckingFabImg,
   "f*cking-fab": fckingFabImg,
   "f**king-fab": fckingFabImg,
+  "fucking-fab": fckingFabImg,
+  "fucking fab": fckingFabImg,
+  "fab": fckingFabImg,
 };
 
 export const ORIGINAL_SEEDED_STORAGE_FILES: Record<string, string> = {
@@ -137,6 +140,7 @@ export function getTransparentPodAsset(
     if (clean.includes("pineapple") || clean.includes("abacaxi") || clean.includes("toasted")) return pineappleToastedImg;
     if (clean.includes("triple berry") || clean.includes("triple")) return tripleBerryImg;
     if (clean.includes("clear")) return clearImg;
+    if (clean.includes("fab") || clean.includes("fucking") || clean.includes("f*cking") || clean.includes("fcking")) return fckingFabImg;
   }
 
   return null;
