@@ -36,8 +36,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4">
-        {/* Lado Esquerdo: Logo + Seletor de Cidade */}
-        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+        {/* Lado Esquerdo: Logo + Seletor de Cidade (Desktop) */}
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           <Link to="/" aria-label={SITE_NAME} className="shrink-0">
             <img
               src={logoImage}
@@ -68,12 +68,14 @@ export function SiteHeader() {
               Alterar
             </span>
           </button>
+        </div>
 
-          {/* Botão de Cidade Compacto Mobile (abaixo de md) */}
+        {/* Centro Mobile: Seletor de Cidade Centralizado */}
+        <div className="flex md:hidden flex-1 justify-center items-center px-1">
           <button
             type="button"
             onClick={() => openSelector()}
-            className="flex md:hidden items-center gap-1 rounded-full border border-primary/25 bg-card/90 px-2 py-1 text-[11px] text-muted-foreground transition-all hover:border-primary hover:text-foreground cursor-pointer shadow-xs max-w-[130px] truncate"
+            className="flex md:hidden items-center justify-center gap-1 rounded-full border border-primary/25 bg-card/90 px-2.5 py-1 text-[11px] text-muted-foreground transition-all hover:border-primary hover:text-foreground cursor-pointer shadow-xs max-w-[130px] truncate"
             title="Alterar cidade"
           >
             <MapPin className="h-3 w-3 text-primary shrink-0" />
@@ -87,7 +89,7 @@ export function SiteHeader() {
         </div>
 
         {/* Lado Direito: Navegação Desktop + Ações Mobile */}
-        <div className="flex items-center gap-0.5 sm:gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
           {/* Links apenas no Desktop */}
           <nav className="hidden md:flex items-center gap-1">
             <Link
