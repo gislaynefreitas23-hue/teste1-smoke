@@ -26,6 +26,7 @@ import {
   saveStoreSettingsLocally,
   fetchRemoteStoreSettings,
   SYSTEM_SETTINGS_CATEGORY,
+  DEFAULT_STORE_SETTINGS,
 } from "../lib/store-settings";
 
 function NotFoundComponent() {
@@ -222,13 +223,27 @@ function RootComponent() {
     }
   }, []);
 
-  // Sincronização em tempo real via Supabase Realtime para produtos, pedidos e personalizações
+  // Sincronização em tempo real via Supabase Realtime para catálogo e personalizações
+  // NOTA: Assinaturas de 'orders' foram removidas do layout público e restritas ao /admin
   useEffect(() => {
     // Carrega configurações da nuvem logo na inicialização
     fetchRemoteStoreSettings().catch(() => {});
 
     const channel = supabase
       .channel("pantanal-realtime-sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "store_settings" },
+        (payload: any) => {
+          const newRecord = payload.new;
+          if (newRecord?.value) {
+            const merged = { ...DEFAULT_STORE_SETTINGS, ...newRecord.value };
+            saveStoreSettingsLocally(merged);
+          } else {
+            fetchRemoteStoreSettings(true).catch(() => {});
+          }
+        }
+      )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "products" },
@@ -250,14 +265,12 @@ function RootComponent() {
           queryClient.invalidateQueries({ queryKey: ["admin-products"] });
         }
       )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Revalida configurações uma única vez ao reconectar caso o admin tenha alterado enquanto offline
+          fetchRemoteStoreSettings(true).catch(() => {});
         }
-      )
-      .subscribe();
+      });
 
     return () => {
       supabase.removeChannel(channel);

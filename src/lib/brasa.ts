@@ -281,8 +281,9 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
 
   return queryOptions({
     queryKey: ["products", targetCity],
-    staleTime: 1000 * 30, // 30 segundos
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5, // 5 minutos (otimização Lovable Cloud)
+    gcTime: 1000 * 60 * 30, // 30 minutos em cache de memória
+    refetchOnWindowFocus: false, // Evita refetch ao trocar abas no mobile; atualizações são coordenadas via Supabase Realtime
     queryFn: async (): Promise<Product[]> => {
       let rawProducts: any[] = [];
 
@@ -497,8 +498,9 @@ export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" |
 
   return queryOptions({
     queryKey: ["product", productId, targetCity],
-    staleTime: 1000 * 30,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 5, // 5 minutos
+    gcTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
     queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
 

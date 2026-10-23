@@ -232,6 +232,12 @@ export const SYSTEM_SETTINGS_CATEGORY = "_system_settings";
 
 const LAST_SAVED_KEY = "pantanal_store_settings_saved_at";
 
+// Cache centralizado em memória com TTL de 10 minutos e deduplicação de requisições em andamento
+let sharedSettingsCache: StoreSettings | null = null;
+let activeFetchPromise: Promise<StoreSettings | null> | null = null;
+let lastFetchTime = 0;
+const SETTINGS_CACHE_TTL = 1000 * 60 * 10; // 10 minutos
+
 /**
  * Salva as configurações em cache local e emite evento para atualização imediata na tela
  */
@@ -257,6 +263,8 @@ export function saveStoreSettingsLocally(settings: StoreSettings) {
       // ignore
     }
   } finally {
+    sharedSettingsCache = settings;
+    lastFetchTime = Date.now();
     // SEMPRE dispara o evento reativo para que toda a interface em tela atualize instantaneamente!
     window.dispatchEvent(new CustomEvent(SETTINGS_EVENT_NAME, { detail: settings }));
   }
@@ -265,69 +273,93 @@ export function saveStoreSettingsLocally(settings: StoreSettings) {
 /**
  * Busca as configurações da loja salvas na nuvem (Supabase)
  */
-export async function fetchRemoteStoreSettings(): Promise<StoreSettings | null> {
-  // Evita que leitura remota desatualizada sobrescreva alterações locais recém-salvas (optimistic update)
-  if (typeof window !== "undefined") {
-    const lastSaved = Number(localStorage.getItem(LAST_SAVED_KEY) || 0);
-    if (Date.now() - lastSaved < 5000) {
-      return getStoreSettings();
-    }
+export async function fetchRemoteStoreSettings(force = false): Promise<StoreSettings | null> {
+  const now = Date.now();
+
+  // 1. Se já temos cache válido e recente na memória, retorna imediatamente sem requisição (0ms)
+  if (!force && sharedSettingsCache && now - lastFetchTime < SETTINGS_CACHE_TTL) {
+    return sharedSettingsCache;
   }
 
-  // 1. Tenta a tabela dedicada store_settings caso tenha sido criada
-  try {
-    const { data, error } = await (supabase as any)
-      .from("store_settings")
-      .select("value")
-      .eq("key", "general")
-      .maybeSingle();
-
-    if (!error && data && (data as any).value) {
-      const merged: StoreSettings = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
-      saveStoreSettingsLocally(merged);
-      return merged;
-    }
-  } catch {
-    // continua para o fallback
+  // 2. Se já existe uma requisição em andamento no momento, compartilha a mesma promessa (deduplicação)
+  if (activeFetchPromise) {
+    return activeFetchPromise;
   }
 
-  // 2. Fallback de alta disponibilidade: registro de sistema na tabela products
-  try {
-    const query = supabase.from("products").select("description");
-    if (typeof (query as any)?.eq === "function") {
-      const { data, error } = await (query as any)
-        .eq("category", SYSTEM_SETTINGS_CATEGORY)
-        .eq("active", true)
-        .maybeSingle();
-
-      if (!error && data?.description) {
-        const parsed = JSON.parse(data.description);
-        const merged: StoreSettings = {
-          ...DEFAULT_STORE_SETTINGS,
-          ...parsed,
-          banners:
-            Array.isArray(parsed.banners) && parsed.banners.length > 0
-              ? parsed.banners
-              : DEFAULT_STORE_SETTINGS.banners,
-          productBadges:
-            parsed.productBadges && Object.keys(parsed.productBadges).length > 0
-              ? parsed.productBadges
-              : DEFAULT_STORE_SETTINGS.productBadges,
-          productPromoPrices: parsed.productPromoPrices || {},
-          productOrder:
-            Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
-              ? parsed.productOrder
-              : DEFAULT_STORE_SETTINGS.productOrder,
-        };
-        saveStoreSettingsLocally(merged);
-        return merged;
+  // 3. Executa a requisição remota compartilhada
+  activeFetchPromise = (async () => {
+    try {
+      if (!force && typeof window !== "undefined") {
+        const lastSaved = Number(localStorage.getItem(LAST_SAVED_KEY) || 0);
+        if (Date.now() - lastSaved < 5000 && sharedSettingsCache) {
+          return sharedSettingsCache;
+        }
       }
-    }
-  } catch {
-    // Fallback silencioso
-  }
 
-  return null;
+      // Tenta tabela store_settings dedicada
+      try {
+        const { data, error } = await (supabase as any)
+          .from("store_settings")
+          .select("value")
+          .eq("key", "general")
+          .maybeSingle();
+
+        if (!error && data && (data as any).value) {
+          const merged: StoreSettings = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
+          sharedSettingsCache = merged;
+          lastFetchTime = Date.now();
+          saveStoreSettingsLocally(merged);
+          return merged;
+        }
+      } catch {
+        // fallback
+      }
+
+      // Fallback: registro de sistema na tabela products
+      try {
+        const query = supabase.from("products").select("description");
+        if (typeof (query as any)?.eq === "function") {
+          const { data, error } = await (query as any)
+            .eq("category", SYSTEM_SETTINGS_CATEGORY)
+            .eq("active", true)
+            .maybeSingle();
+
+          if (!error && data?.description) {
+            const parsed = JSON.parse(data.description);
+            const merged: StoreSettings = {
+              ...DEFAULT_STORE_SETTINGS,
+              ...parsed,
+              banners:
+                Array.isArray(parsed.banners) && parsed.banners.length > 0
+                  ? parsed.banners
+                  : DEFAULT_STORE_SETTINGS.banners,
+              productBadges:
+                parsed.productBadges && Object.keys(parsed.productBadges).length > 0
+                  ? parsed.productBadges
+                  : DEFAULT_STORE_SETTINGS.productBadges,
+              productPromoPrices: parsed.productPromoPrices || {},
+              productOrder:
+                Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
+                  ? parsed.productOrder
+                  : DEFAULT_STORE_SETTINGS.productOrder,
+            };
+            sharedSettingsCache = merged;
+            lastFetchTime = Date.now();
+            saveStoreSettingsLocally(merged);
+            return merged;
+          }
+        }
+      } catch {
+        // Fallback silencioso
+      }
+
+      return sharedSettingsCache || getStoreSettings();
+    } finally {
+      activeFetchPromise = null;
+    }
+  })();
+
+  return activeFetchPromise;
 }
 
 /**
@@ -399,26 +431,30 @@ export async function saveStoreSettings(settings: StoreSettings): Promise<void> 
  * Hook React reativo para usar as configurações da loja em qualquer página com sincronização contínua
  */
 export function useStoreSettings() {
-  const [settings, setSettings] = useState<StoreSettings>(getStoreSettings());
+  const [settings, setSettings] = useState<StoreSettings>(() => sharedSettingsCache || getStoreSettings());
 
   useEffect(() => {
-    // Busca remota inicial
-    fetchRemoteStoreSettings().then((remote) => {
-      if (remote) setSettings(remote);
-    });
+    let active = true;
 
-    // Polling a cada 4 segundos como garantia de atualização contínua em tempo real
-    const interval = setInterval(() => {
+    // Dispara a busca remota compartilhada apenas se o cache ainda não existir ou se o TTL de 10 min expirou
+    const now = Date.now();
+    if (!sharedSettingsCache || now - lastFetchTime >= SETTINGS_CACHE_TTL) {
       fetchRemoteStoreSettings().then((remote) => {
-        if (remote) setSettings(remote);
+        if (active && remote) {
+          setSettings(remote);
+        }
       });
-    }, 4000);
+    }
 
+    // Otimização Lovable Cloud: eliminado o polling de 4 segundos que multiplicava chamadas por elemento.
+    // Sincronização em tempo real é conduzida via eventos reativos imediatos (Supabase Realtime + admin).
     function handleUpdate(e: Event) {
-      if ((e as CustomEvent).detail) {
-        setSettings((e as CustomEvent).detail);
-      } else {
-        setSettings(getStoreSettings());
+      const detail = (e as CustomEvent).detail;
+      const updated = detail || sharedSettingsCache || getStoreSettings();
+      sharedSettingsCache = updated;
+      lastFetchTime = Date.now();
+      if (active) {
+        setSettings(updated);
       }
     }
 
@@ -426,7 +462,7 @@ export function useStoreSettings() {
     window.addEventListener("storage", handleUpdate);
 
     return () => {
-      clearInterval(interval);
+      active = false;
       window.removeEventListener(SETTINGS_EVENT_NAME, handleUpdate);
       window.removeEventListener("storage", handleUpdate);
     };

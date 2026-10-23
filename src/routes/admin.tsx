@@ -486,8 +486,26 @@ function MasterAdminApp({
   const queryClient = useQueryClient();
   const { settings, saveSettings } = useStoreSettings();
 
+  // Sincronização em tempo real de pedidos exclusiva para a sessão administrativa ativa
+  useEffect(() => {
+    const ordersChannel = supabase
+      .channel("admin-orders-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [queryClient]);
+
   // Consulta de pedidos reais no Supabase com reconciliação segura
-  const { data: orders = [], isLoading: isLoadingOrders } = useQuery({
+  const { data: orders = [], isLoading: isLoadingOrders, isFetching: isFetchingOrders } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: async () => {
       let dbOrders: any[] = [];
@@ -516,7 +534,9 @@ function MasterAdminApp({
 
       return [...pendingLocal, ...dbOrders];
     },
-    refetchInterval: 15000,
+    refetchInterval: 120000, // 2 minutos como fallback seguro (otimização Lovable Cloud)
+    refetchIntervalInBackground: false, // Não sobrecarrega o banco com a aba em segundo plano
+    refetchOnWindowFocus: true, // Revalida ao retornar para a aba do painel
   });
 
   // Consulta de produtos cadastrados no Supabase com inventários
@@ -717,7 +737,7 @@ function MasterAdminApp({
               }}
               className="border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 gap-1.5"
             >
-              <RefreshCw className="h-3.5 w-3.5 text-primary" />
+              <RefreshCw className={`h-3.5 w-3.5 text-primary ${isFetchingOrders ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Atualizar Dados</span>
             </Button>
 
@@ -1176,6 +1196,18 @@ function OrdersManagementSection({ orders }: { orders: any[] }) {
             <option value="entregue">Entregue</option>
             <option value="cancelado">Cancelado</option>
           </select>
+
+          {/* Botão de Atualização Manual de Pedidos */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["admin-orders"] })}
+            className="border-slate-800 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 gap-1.5"
+            title="Atualizar lista de pedidos manualmente"
+          >
+            <RefreshCw className="h-3.5 w-3.5 text-primary" />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
         </div>
       </div>
 
