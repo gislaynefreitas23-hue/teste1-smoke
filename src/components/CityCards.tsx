@@ -49,16 +49,11 @@ export function CityCards({ onSelected, compact = false }: CityCardsProps) {
                   <MapPin className="h-4 w-4 sm:h-6 sm:w-6" aria-hidden="true" />
                 </div>
 
-                {isSelected ? (
+                {isSelected && (
                   <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/15 px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs font-semibold text-primary shrink-0">
                     <Check className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     <span className="hidden sm:inline">Região ativa</span>
                     <span className="sm:hidden">Ativo</span>
-                  </span>
-                ) : (
-                  <span className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground group-hover:text-foreground shrink-0">
-                    <span className="hidden sm:inline">Atendimento local</span>
-                    <span className="sm:hidden">Local</span>
                   </span>
                 )}
               </div>
@@ -67,24 +62,10 @@ export function CityCards({ onSelected, compact = false }: CityCardsProps) {
                 <h3 className="text-base sm:text-3xl font-bold tracking-tight text-foreground leading-snug">
                   {city.name} <span className="text-xs sm:text-2xl text-muted-foreground sm:text-foreground">- {city.shortState}</span>
                 </h3>
-                <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-sm font-medium text-muted-foreground line-clamp-1">
-                  {city.state}
-                </p>
-                {city.id === "cuiaba" ? (
-                  <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium text-muted-foreground leading-tight">
-                    <span className="hidden sm:inline">Entrega local · Atendimento das 10h às 19h</span>
-                    <span className="sm:hidden">Entrega local rápida</span>
-                  </p>
-                ) : (
-                  <p className="mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium text-muted-foreground leading-tight">
-                    <span className="hidden sm:inline">Envios expressos para a capital</span>
-                    <span className="sm:hidden">Envio expresso SP</span>
-                  </p>
-                )}
               </div>
             </div>
 
-            <div className="mt-3 sm:mt-8 pt-2 sm:pt-4 border-t border-border/40">
+            <div className="mt-3 sm:mt-6 pt-2 sm:pt-4 border-t border-border/40">
               <Button
                 type="button"
                 size={compact ? "default" : "lg"}

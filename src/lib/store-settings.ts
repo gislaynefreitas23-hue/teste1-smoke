@@ -80,7 +80,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   openingHours: "Atendimento das 10h às 19h",
   announcementActive: true,
   announcementText: "Entrega com taxa fixa de R$ 10,00 para toda a cidade de Cuiabá",
-  homeHighlightPhrase: "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.",
+  homeHighlightPhrase: "Encontre tudo que combina com seu estilo.",
   benefitCardTitle: "100% Online, Estoque Local",
   benefitCardDescription: "Compre online com praticidade e receba seus produtos no conforto de casa, no mesmo dia.",
   footerTagline: "De Cuiabá a São Paulo, conectando vibes.",

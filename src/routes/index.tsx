@@ -1,7 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Truck, Wallet } from "lucide-react";
+import { ArrowRight, Truck, Wallet } from "lucide-react";
 
-import brandImage from "@/assets/pantanal-brand.png";
+import heroBgImage from "@/assets/hero-vibe-bg.png";
 import { Button } from "@/components/ui/button";
 import { CitySection } from "@/components/CitySection";
 import { ProductBannerCarousel } from "@/components/ProductBannerCarousel";
@@ -15,12 +15,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra. Essências, narguilés e acessórios em Cuiabá e São Paulo.",
+          "Encontre tudo que combina com seu estilo. Essências, narguilés e acessórios em Cuiabá e São Paulo.",
       },
       { property: "og:title", content: "Pantanal Smoke — Conecte-se à sua vibe" },
       {
         property: "og:description",
-        content: "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra.",
+        content: "Encontre tudo que combina com seu estilo.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -33,40 +33,59 @@ function Home() {
   const { requireCityOrNavigate } = useCity();
   const { settings } = useStoreSettings();
 
+  const highlightPhrase =
+    settings.homeHighlightPhrase &&
+    settings.homeHighlightPhrase !== "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."
+      ? settings.homeHighlightPhrase
+      : "Encontre tudo que combina com seu estilo.";
+
   return (
     <main className="mx-auto max-w-6xl px-4">
-      {/* Apresentação Principal da Marca / Hero */}
-      <section className="pt-6 pb-2 text-center sm:pt-10 sm:pb-4">
-        <img
-          src={brandImage}
-          alt="Pantanal Smoke"
-          width={1536}
-          height={512}
-          className="mx-auto w-full max-w-lg object-contain"
+      {/* Banner Principal / Hero Minimalista e Sofisticado (Inspirado na Variação 1) */}
+      <section
+        aria-label="Apresentação Principal Pantanal Smoke"
+        className="relative my-3 sm:my-5 min-h-[240px] sm:min-h-[260px] md:min-h-[275px] overflow-hidden rounded-2xl sm:rounded-3xl border border-purple-950/40 bg-black shadow-2xl flex flex-col justify-center px-5 py-6 sm:px-8 sm:py-8"
+      >
+        {/* Fundo Abstrato com Fumaça Roxa Fluida (posicionada à direita) */}
+        <div
+          className="absolute inset-0 bg-cover bg-no-repeat bg-[center_right] sm:bg-right opacity-90 sm:opacity-95 pointer-events-none"
+          style={{ backgroundImage: `url(${heroBgImage})` }}
+          aria-hidden="true"
         />
-        <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-          Conecte-se à sua <span className="text-ember">vibe</span>.
-        </h1>
-        <p className="mx-auto mt-2 max-w-xl text-sm sm:text-base text-muted-foreground">
-          {settings.homeHighlightPhrase || "Encontre tudo que combina com sua vibe e ganhe benefícios em cada compra."}
-        </p>
-        <div className="mt-4 flex flex-wrap justify-center gap-2.5 sm:mt-6 sm:gap-3">
-          <Button size="default" className="bg-ember px-6 sm:px-8 shadow-glow" asChild>
-            <Link
-              to="/produtos"
-              onClick={(e) => requireCityOrNavigate("/produtos", e)}
+
+        {/* Gradiente escuro lateral para contraste perfeito do texto */}
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-black via-black/85 sm:via-black/75 to-transparent pointer-events-none"
+          aria-hidden="true"
+        />
+
+        {/* Conteúdo do Banner alinhado à esquerda */}
+        <div className="relative z-10 max-w-[260px] sm:max-w-md">
+          <h1 className="text-[28px] sm:text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-[1.12]">
+            Conecte-se
+            <br />
+            à sua <span className="text-[#a855f7] drop-shadow-[0_0_22px_rgba(168,85,247,0.55)]">vibe.</span>
+          </h1>
+
+          <p className="mt-2 text-[13px] sm:text-sm text-slate-300/90 leading-snug">
+            {highlightPhrase}
+          </p>
+
+          <div className="mt-4 sm:mt-5">
+            <Button
+              size="default"
+              className="group h-auto bg-[#9333ea] hover:bg-[#a855f7] text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-xl sm:rounded-2xl font-semibold shadow-[0_4px_18px_rgba(147,51,234,0.4)] transition-all duration-200 active:scale-95 inline-flex items-center gap-2 text-sm sm:text-base cursor-pointer"
+              asChild
             >
-              Ver produtos
-            </Link>
-          </Button>
-          <Button size="default" variant="outline" className="px-6 sm:px-8" asChild>
-            <Link
-              to="/recomendar"
-              onClick={(e) => requireCityOrNavigate("/recomendar", e)}
-            >
-              Me ajude a escolher
-            </Link>
-          </Button>
+              <Link
+                to="/produtos"
+                onClick={(e) => requireCityOrNavigate("/produtos", e)}
+              >
+                <span>Ver produtos</span>
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </section>
 
