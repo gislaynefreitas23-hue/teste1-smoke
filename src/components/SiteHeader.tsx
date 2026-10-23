@@ -293,6 +293,13 @@ export function SiteHeader() {
         </div>
       </div>
 
+      {/* Linha Institucional Compacta: Identificação do Segmento */}
+      <div className="border-t border-purple-950/30 bg-black h-7 flex items-center justify-center px-4">
+        <p className="text-[10px] sm:text-[11px] font-medium tracking-[0.22em] text-purple-300/85 uppercase select-none text-center whitespace-nowrap">
+          TABACARIA ESPECIALIZADA
+        </p>
+      </div>
+
       {/* Faixa de Cabeçalho Mobile: Produtos de Lançamento (aparece como cabeçalho no celular) */}
       <MobileLaunchHeader />
     </header>
