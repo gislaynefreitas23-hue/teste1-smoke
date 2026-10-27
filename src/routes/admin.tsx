@@ -1480,8 +1480,10 @@ function ProductsManagementSection() {
     setDraft({
       id: null,
       name: "",
+      variation_name: "",
       category: "Pod Descartável",
       description: "",
+      short_description: "",
       flavor_profile: "",
       intensity: "média",
       image_url: "",
@@ -1526,8 +1528,10 @@ function ProductsManagementSection() {
     setDraft({
       id: p.id,
       name: p.name,
+      variation_name: settings.productVariations?.[p.id] || "",
       category: p.category,
       description: p.description || "",
+      short_description: settings.productShortDescriptions?.[p.id] || "",
       flavor_profile: p.flavor_profile || "",
       intensity: p.intensity || "média",
       image_url: p.image_url || "",
@@ -1635,6 +1639,20 @@ function ProductsManagementSection() {
       updatedOrder.push(productId);
     }
 
+    const updatedVariations = { ...(settings.productVariations || {}) };
+    if (draft.variation_name?.trim()) {
+      updatedVariations[productId] = draft.variation_name.trim();
+    } else {
+      delete updatedVariations[productId];
+    }
+
+    const updatedShortDescs = { ...(settings.productShortDescriptions || {}) };
+    if (draft.short_description?.trim()) {
+      updatedShortDescs[productId] = draft.short_description.trim();
+    } else {
+      delete updatedShortDescs[productId];
+    }
+
     const updatedCityInventories = { ...(settings.cityInventories || {}) };
     updatedCityInventories[productId] = {
       cuiaba: {
@@ -1655,6 +1673,8 @@ function ProductsManagementSection() {
       productBadges: updatedBadges,
       productPromoPrices: updatedPromoPrices,
       productOrder: updatedOrder,
+      productVariations: updatedVariations,
+      productShortDescriptions: updatedShortDescs,
     });
 
     setBusy(false);
@@ -1771,8 +1791,8 @@ function ProductsManagementSection() {
             </Button>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
               <Label className="text-xs font-semibold text-slate-300">Nome do Produto</Label>
               <Input
                 value={draft.name}
@@ -1784,6 +1804,18 @@ function ProductsManagementSection() {
             </div>
 
             <div>
+              <Label className="text-xs font-semibold text-slate-300">Variação / Nome Complementar</Label>
+              <Input
+                value={draft.variation_name || ""}
+                onChange={(e) => setDraft({ ...draft, variation_name: e.target.value })}
+                placeholder="Ex: Série Especial, 40K Puffs"
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
               <Label className="text-xs font-semibold text-slate-300">Categoria</Label>
               <Input
                 value={draft.category}
@@ -1791,6 +1823,16 @@ function ProductsManagementSection() {
                 placeholder="Ex: Pod Descartável, Essências, Narguilé"
                 className="mt-1.5 bg-slate-950 border-slate-800 text-white"
                 required
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-slate-300">Descrição Resumida (Exibida no Card)</Label>
+              <Input
+                value={draft.short_description || ""}
+                onChange={(e) => setDraft({ ...draft, short_description: e.target.value })}
+                placeholder="Ex: Framboesa azul vibrante com acabamento gelado..."
+                className="mt-1.5 bg-slate-950 border-slate-800 text-white"
               />
             </div>
           </div>
@@ -2444,6 +2486,36 @@ function CustomizeSiteSection({
               </div>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="text-[11px]">Subtítulo / Linha Superior</Label>
+                <Input
+                  value={editingSlide.subtitle || ""}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, subtitle: e.target.value })}
+                  placeholder="Ex: Série Especial Turbo"
+                  className="mt-1 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-[11px]">Texto do Botão</Label>
+                <Input
+                  value={editingSlide.buttonText || ""}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, buttonText: e.target.value })}
+                  placeholder="Ex: Conferir novidade"
+                  className="mt-1 text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-[11px]">Destino do Link</Label>
+                <Input
+                  value={editingSlide.buttonUrl || ""}
+                  onChange={(e) => setEditingSlide({ ...editingSlide, buttonUrl: e.target.value })}
+                  placeholder="Ex: /produtos ou /produtos/ID"
+                  className="mt-1 text-xs"
+                />
+              </div>
+            </div>
+
             <div>
               <Label className="text-[11px] font-semibold text-slate-200">
                 Descrição do Produto / Perfil de Sabor
@@ -2557,7 +2629,123 @@ function CustomizeSiteSection({
         </div>
       </div>
 
-      {/* BLOCO 2: ELEMENTOS DE DESTAQUE DA HOME */}
+      {/* BLOCO 2: CONFIGURAÇÕES VISUAIS DO CATÁLOGO (/produtos) */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
+        <div className="border-b border-slate-800 pb-3">
+          <h3 className="font-bold text-white text-sm flex items-center gap-2">
+            <Sliders className="h-4 w-4 text-primary" />
+            Configurações de Exibição do Catálogo (/produtos)
+          </h3>
+          <p className="text-[11px] text-slate-400">
+            Controle os elementos visuais exibidos nos cards da loja sem alterar dados comerciais ou de estoque.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 text-xs">
+          <div className="space-y-3 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs font-semibold text-slate-200">Exibir Descrição Resumida</Label>
+                <p className="text-[10px] text-slate-400">Mostra a linha de descrição resumida no card do produto</p>
+              </div>
+              <Switch
+                checked={formData.catalogSettings?.showShortDescription !== false}
+                onCheckedChange={(c) =>
+                  setFormData({
+                    ...formData,
+                    catalogSettings: {
+                      ...(formData.catalogSettings || DEFAULT_STORE_SETTINGS.catalogSettings),
+                      showShortDescription: c,
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-3">
+              <div>
+                <Label className="text-xs font-semibold text-slate-200">Exibir Perfil de Sabor</Label>
+                <p className="text-[10px] text-slate-400">Exibe notas de sabor (ex: Menta Gelada, Uva Ice)</p>
+              </div>
+              <Switch
+                checked={formData.catalogSettings?.showFlavorProfile !== false}
+                onCheckedChange={(c) =>
+                  setFormData({
+                    ...formData,
+                    catalogSettings: {
+                      ...(formData.catalogSettings || DEFAULT_STORE_SETTINGS.catalogSettings),
+                      showFlavorProfile: c,
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-slate-800/60 pt-3">
+              <div>
+                <Label className="text-xs font-semibold text-slate-200">Exibir Selo de Lançamento</Label>
+                <p className="text-[10px] text-slate-400">Mostra o selo dourado 'LANÇAMENTO' nos produtos marcados</p>
+              </div>
+              <Switch
+                checked={formData.catalogSettings?.showLaunchBadges !== false}
+                onCheckedChange={(c) =>
+                  setFormData({
+                    ...formData,
+                    catalogSettings: {
+                      ...(formData.catalogSettings || DEFAULT_STORE_SETTINGS.catalogSettings),
+                      showLaunchBadges: c,
+                    },
+                  })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-xs font-semibold text-slate-200">Exibir Quantidade de Estoque</Label>
+                <p className="text-[10px] text-slate-400">Mostra '15 un.' no card (desativado mantém o visual premium limpo)</p>
+              </div>
+              <Switch
+                checked={!!formData.catalogSettings?.showStockCount}
+                onCheckedChange={(c) =>
+                  setFormData({
+                    ...formData,
+                    catalogSettings: {
+                      ...(formData.catalogSettings || DEFAULT_STORE_SETTINGS.catalogSettings),
+                      showStockCount: c,
+                    },
+                  })
+                }
+              />
+            </div>
+
+            <div className="border-t border-slate-800/60 pt-3">
+              <Label className="text-xs font-semibold text-slate-200">Texto do Botão de Compra</Label>
+              <Input
+                value={formData.catalogSettings?.buttonText || "Adicionar"}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    catalogSettings: {
+                      ...(formData.catalogSettings || DEFAULT_STORE_SETTINGS.catalogSettings),
+                      buttonText: e.target.value,
+                    },
+                  })
+                }
+                placeholder="Ex: Adicionar, Comprar, Pedir"
+                className="mt-1.5 bg-slate-900 border-slate-700 text-white text-xs"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Texto exibido dentro do botão roxo na base de cada card do catálogo.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* BLOCO 3: ELEMENTOS DE DESTAQUE DA HOME */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
         <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-3">
           <Sliders className="h-4 w-4 text-primary" />

@@ -23,21 +23,27 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
-  // Verificação defensiva de rota para evitar renderizar no checkout ou admin
+  // Verificação defensiva de rota para evitar renderizar no checkout, admin ou na página de produtos
   let pathname = "/";
   try {
     const loc = useLocation();
     pathname = loc.pathname;
   } catch {
-    pathname = "/";
+    if (typeof window !== "undefined") {
+      pathname = window.location.pathname;
+    }
   }
 
-  // Não renderiza em páginas de checkout, no painel admin ou na página de produtos (onde o carrossel principal já é exibido)
+  const browserPath = typeof window !== "undefined" ? window.location.pathname : "";
+
+  // Não renderiza em páginas de checkout, no painel admin ou na página de produtos (/produtos)
   if (
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/admin") ||
-    pathname === "/produtos" ||
-    pathname === "/produtos/"
+    pathname.startsWith("/produtos") ||
+    browserPath.startsWith("/checkout") ||
+    browserPath.startsWith("/admin") ||
+    browserPath.startsWith("/produtos")
   ) {
     return null;
   }

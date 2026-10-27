@@ -8,14 +8,25 @@ export interface BannerSlide {
   id: string;
   badge: string;
   title: string;
+  subtitle?: string;
   puffs: string;
   footerPhrase: string;
   flavorDesc?: string;
   description?: string;
   imageUrl: string;
+  buttonText?: string;
+  buttonUrl?: string;
   active: boolean;
   order: number;
   productId?: string;
+}
+
+export interface CatalogSettings {
+  showShortDescription: boolean;
+  showLaunchBadges: boolean;
+  showFlavorProfile: boolean;
+  showStockCount: boolean;
+  buttonText: string;
 }
 
 export interface StoreSettings {
@@ -37,6 +48,9 @@ export interface StoreSettings {
   footerContactText: string;
   banners: BannerSlide[];
 
+  // Configurações Visuais do Catálogo (/produtos)
+  catalogSettings: CatalogSettings;
+
   // Conteúdos Institucionais (Sobre Nós & Perguntas Frequentes)
   aboutUsTitle: string;
   aboutUsParagraph1: string;
@@ -48,10 +62,12 @@ export interface StoreSettings {
   faqSubtitle: string;
   faqs: FAQSettingItem[];
 
-  // Destaques e Ordenação de Produtos
+  // Destaques, Ordenação e Informações de Produtos
   productBadges: Record<string, "nenhum" | "lancamento" | "promocao">;
   productPromoPrices: Record<string, number>;
   productOrder: string[];
+  productVariations?: Record<string, string>;
+  productShortDescriptions?: Record<string, string>;
   cityInventories?: Record<
     string,
     {
@@ -182,6 +198,15 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     "1eeb97e8-5f52-48a4-9847-cd62daf9b37f", // Triple Berry
     "566e06a8-2051-40f7-90df-70b0a275a1ad", // Clear
   ],
+  catalogSettings: {
+    showShortDescription: true,
+    showLaunchBadges: true,
+    showFlavorProfile: true,
+    showStockCount: false,
+    buttonText: "Adicionar",
+  },
+  productVariations: {},
+  productShortDescriptions: {},
 };
 
 const SETTINGS_STORAGE_KEY = "pantanal_store_settings";
@@ -222,6 +247,12 @@ export function getStoreSettings(): StoreSettings {
         Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
           ? parsed.productOrder
           : DEFAULT_STORE_SETTINGS.productOrder,
+      catalogSettings: {
+        ...DEFAULT_STORE_SETTINGS.catalogSettings,
+        ...(parsed.catalogSettings || {}),
+      },
+      productVariations: parsed.productVariations || {},
+      productShortDescriptions: parsed.productShortDescriptions || {},
     };
   } catch {
     return DEFAULT_STORE_SETTINGS;
@@ -342,6 +373,12 @@ export async function fetchRemoteStoreSettings(force = false): Promise<StoreSett
                 Array.isArray(parsed.productOrder) && parsed.productOrder.length > 0
                   ? parsed.productOrder
                   : DEFAULT_STORE_SETTINGS.productOrder,
+              catalogSettings: {
+                ...DEFAULT_STORE_SETTINGS.catalogSettings,
+                ...(parsed.catalogSettings || {}),
+              },
+              productVariations: parsed.productVariations || {},
+              productShortDescriptions: parsed.productShortDescriptions || {},
             };
             sharedSettingsCache = merged;
             lastFetchTime = Date.now();
