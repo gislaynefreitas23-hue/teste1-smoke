@@ -47,8 +47,8 @@ export function CarouselSlideImage({
     getTransparentPodAsset(productId, imageUrl, productName || alt) ||
     getCachedCleanImage(imageUrl);
 
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(instantAsset);
-  const [isReady, setIsReady] = useState<boolean>(!!instantAsset);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(instantAsset || imageUrl);
+  const [isReady, setIsReady] = useState<boolean>(true);
 
   useEffect(() => {
     let active = true;
@@ -326,157 +326,150 @@ export function ProductBannerCarousel({
                 aria-hidden={!isSlideActive}
                 className={`w-full shrink-0 ${
                   compact
-                    ? "px-3 py-2 sm:px-6 sm:py-3.5 md:px-8 md:py-4"
-                    : "px-3.5 py-2.5 sm:px-12 sm:py-8 md:px-14 md:py-10"
+                    ? "px-4 pt-2.5 pb-2 sm:px-6 sm:py-3.5 md:px-8 md:py-4"
+                    : "px-6 pt-3 pb-2 sm:px-12 sm:py-8 md:px-14 md:py-10"
                 }`}
               >
                 <div
-                  className={`grid grid-cols-1 items-center gap-2 sm:gap-6 md:grid-cols-12 ${
+                  className={`flex flex-col justify-center ${
                     compact
-                      ? "min-h-[130px] sm:min-h-[160px] md:min-h-[175px]"
-                      : "min-h-[200px] sm:min-h-[300px] md:min-h-[360px]"
+                      ? "min-h-[120px] sm:min-h-[150px] md:min-h-[175px]"
+                      : "min-h-[150px] sm:min-h-[260px] md:min-h-[320px]"
                   }`}
                 >
-                  {/* Coluna 1: Informações e Destaques */}
-                  <div
-                    className={`flex flex-col justify-center ${
-                      compact
-                        ? "space-y-1 sm:space-y-2 md:col-span-8"
-                        : "space-y-1.5 sm:space-y-3 md:space-y-4 md:col-span-7 lg:col-span-8"
-                    }`}
-                  >
-                    {/* Linha Superior: Selo LANÇAMENTO + Badges */}
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                      {/* Selo LANÇAMENTO destacado em roxo neon com brilho elegante */}
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-[#A855F7] font-black uppercase text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] ${
-                          compact
-                            ? "px-1.5 py-0.5 text-[8.5px] sm:text-[10px] tracking-[0.15em]"
-                            : "px-2 py-0.5 text-[8.5px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wider sm:tracking-[0.25em]"
-                        }`}
-                      >
-                        <span className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-white animate-pulse" />
-                        LANÇAMENTO
-                      </span>
+                  {/* Linha Superior: Selos LANÇAMENTO + Badges (fixados na parte superior) */}
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2.5">
+                    {/* Selo LANÇAMENTO destacado em roxo neon com brilho elegante */}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border border-purple-400/40 bg-[#A855F7] font-black uppercase text-white shadow-[0_0_12px_rgba(168,85,247,0.5)] ${
+                        compact
+                          ? "px-1.5 py-0.5 text-[8.5px] sm:text-[10px] tracking-[0.15em]"
+                          : "px-2 py-0.5 text-[8.5px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wider sm:tracking-[0.25em]"
+                      }`}
+                    >
+                      <span className="h-1 w-1 sm:h-1.5 sm:w-1.5 rounded-full bg-white animate-pulse" />
+                      LANÇAMENTO
+                    </span>
 
-                      {/* Identificação 40.000 PUFFS */}
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border border-purple-600/40 bg-[#25222B] font-bold text-purple-200 shadow-sm backdrop-blur-sm ${
-                          compact
-                            ? "px-1.5 py-0.5 text-[9px] sm:text-[11px] tracking-wide"
-                            : "px-2 py-0.5 text-[9px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wide sm:tracking-wider"
-                        }`}
-                      >
-                        <Zap className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-purple-400" />
-                        {slide.puffs}
-                      </span>
+                    {/* Identificação 40.000 PUFFS */}
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border border-purple-600/40 bg-[#25222B] font-bold text-purple-200 shadow-sm backdrop-blur-sm ${
+                        compact
+                          ? "px-1.5 py-0.5 text-[9px] sm:text-[11px] tracking-wide"
+                          : "px-2 py-0.5 text-[9px] sm:px-3.5 sm:py-1 sm:text-xs tracking-wide sm:tracking-wider"
+                      }`}
+                    >
+                      <Zap className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 text-purple-400" />
+                      {slide.puffs}
+                    </span>
 
-                      {/* Tag de Tecnologia Turbo */}
-                      <span
-                        className={`items-center gap-1 rounded-full border border-slate-400/40 bg-slate-900/10 font-semibold tracking-wide text-[#34313B] ${
-                          compact
-                            ? "hidden sm:inline-flex px-2 py-0.5 text-[10px]"
-                            : "hidden sm:inline-flex px-3 py-1 text-[11px]"
-                        }`}
-                      >
-                        <Gauge className="h-3 w-3 text-slate-600" />
-                        {slide.subtitle}
-                      </span>
-                    </div>
-
-                    {/* Nome do Produto com Tipografia Escura Forte sobre fundo luminoso */}
-                    <div>
-                      <h2
-                        className={`font-black tracking-tight text-[#221F28] ${
-                          compact
-                            ? "text-lg sm:text-2xl md:text-3xl leading-tight"
-                            : "text-xl sm:text-4xl md:text-5xl leading-tight"
-                        }`}
-                      >
-                        {slide.name}
-                      </h2>
-                      <p
-                        className={`font-medium text-[#4A4652] ${
-                          compact
-                            ? "mt-0.5 max-w-lg text-[10px] sm:text-xs line-clamp-1 sm:line-clamp-2 leading-snug"
-                            : "mt-0.5 sm:mt-2.5 max-w-xl text-[11px] sm:text-sm md:text-base line-clamp-1 sm:line-clamp-2 leading-snug sm:leading-relaxed"
-                        }`}
-                      >
-                        {slide.flavorDesc}
-                      </p>
-                    </div>
-
-                    {/* Recursos e Performance */}
-                    {!compact ? (
-                      <div className="hidden sm:flex flex-wrap items-center gap-2 pt-1 text-[11px] font-medium text-[#423E4B] sm:text-xs">
-                        {slide.features.map((feature, fIdx) => (
-                          <div key={feature} className="flex items-center gap-1.5">
-                            {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
-                            <span className="flex items-center gap-1">
-                              <span className="h-1.5 w-1.5 rounded-full bg-[#A855F7] shadow-[0_0_6px_rgba(168,85,247,0.9)]" />
-                              {feature}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="hidden sm:flex flex-wrap items-center gap-2 pt-0.5 text-[10px] font-medium text-[#423E4B]">
-                        {slide.features.slice(0, 2).map((feature, fIdx) => (
-                          <div key={feature} className="flex items-center gap-1">
-                            {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
-                            <span className="h-1 w-1 rounded-full bg-[#A855F7]" />
-                            <span>{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Botão de ação direta para o produto */}
-                    <div className={compact ? "pt-0.5 flex items-center gap-2" : "pt-1 sm:pt-2 flex items-center gap-2 sm:gap-3"}>
-                      <a
-                        href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
-                        aria-label={`Conheça o lançamento ${slide.name}`}
-                        className={`inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#A84CFF] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,76,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,76,255,0.5)] cursor-pointer whitespace-nowrap w-fit max-w-full ${
-                          compact
-                            ? "px-2.5 py-1 text-[10px]"
-                            : "px-3 py-1 text-[11px] sm:px-5 sm:py-2.5 sm:text-sm md:px-6 md:py-2.5"
-                        }`}
-                      >
-                        <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 text-amber-300" />
-                        <span className="inline md:hidden">{slide.buttonText || "Conferir novidade"}</span>
-                        <span className="hidden md:inline">{slide.buttonText || "Conheça o lançamento"}</span>
-                        <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
-                      </a>
-                    </div>
+                    {/* Tag de Tecnologia Turbo (visível em tablet/desktop) */}
+                    <span
+                      className={`items-center gap-1 rounded-full border border-slate-400/40 bg-slate-900/10 font-semibold tracking-wide text-[#34313B] ${
+                        compact
+                          ? "hidden sm:inline-flex px-2 py-0.5 text-[10px]"
+                          : "hidden sm:inline-flex px-3 py-1 text-[11px]"
+                      }`}
+                    >
+                      <Gauge className="h-3 w-3 text-slate-600" />
+                      {slide.subtitle}
+                    </span>
                   </div>
 
-                  {/* Coluna 2: Produto com Fumaça Roxa Integrada (Sem Caixa Branca) */}
-                  <div className={`flex items-center justify-center ${compact ? "md:col-span-4" : "md:col-span-5 lg:col-span-4"}`}>
-                    <a
-                      href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
-                      className={`group/img relative flex w-full items-center justify-center cursor-pointer ${
-                        compact
-                          ? "h-24 sm:h-36 md:h-40 max-w-[110px] sm:max-w-[160px]"
-                          : "h-28 sm:h-72 sm:max-w-[280px] md:h-84 max-w-[145px] sm:max-w-[260px] mx-auto"
-                      }`}
-                      aria-label={`Ver detalhes de ${slide.name}`}
-                    >
-                      {/* Iluminação difusa roxa projetada atrás da imagem original do produto */}
-                      <div
-                        className={`pointer-events-none absolute inset-0 rounded-full opacity-40 transition-all duration-500 group-hover/img:opacity-65 ${
-                          compact ? "-m-3 blur-xl" : "-m-4 sm:-m-6 blur-xl sm:blur-2xl"
-                        }`}
-                        style={{ background: slide.glowColor }}
-                        aria-hidden="true"
-                      />
-                      <CarouselSlideImage
-                        imageUrl={slide.image}
-                        alt={`${slide.name} — ${slide.puffs}`}
-                        isEager={index === 0}
-                        productId={slide.productId}
-                        productName={slide.name}
-                      />
-                    </a>
+                  {/* Estrutura Integrada: Imagem à esquerda e Informações à direita no mobile; 12 cols no desktop */}
+                  <div className="flex flex-row md:grid md:grid-cols-12 items-center gap-2 sm:gap-6">
+                    {/* Lateral Esquerda no mobile: Imagem aumentada com inclinação de 15° no sentido horário */}
+                    <div className="shrink-0 w-28 min-[400px]:w-32 sm:w-36 md:w-auto md:max-w-none md:order-2 md:col-span-5 lg:col-span-4 flex items-center justify-center">
+                      <a
+                        href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
+                        className="group/img relative flex w-full h-28 min-[400px]:h-32 sm:h-36 md:h-72 items-center justify-center cursor-pointer"
+                        aria-label={`Ver detalhes de ${slide.name}`}
+                      >
+                        {/* Iluminação difusa roxa projetada atrás da imagem original do produto */}
+                        <div
+                          className="pointer-events-none absolute inset-0 rounded-full opacity-40 blur-lg sm:blur-xl transition-all duration-500 group-hover/img:opacity-65 -m-2 sm:-m-4"
+                          style={{ background: slide.glowColor }}
+                          aria-hidden="true"
+                        />
+                        {/* Imagem com inclinação de 15° e escala aumentada no mobile */}
+                        <div className="relative z-10 h-full w-full flex items-center justify-center transition-transform duration-300 rotate-[15deg] scale-105 min-[400px]:scale-110 md:scale-100 md:rotate-0">
+                          <CarouselSlideImage
+                            imageUrl={slide.image}
+                            alt={`${slide.name} — ${slide.puffs}`}
+                            isEager={index === 0}
+                            productId={slide.productId}
+                            productName={slide.name}
+                          />
+                        </div>
+                      </a>
+                    </div>
+
+                    {/* Lateral Direita no mobile: Título, Descrição e Botão organizados no mesmo card */}
+                    <div className="flex-1 min-w-0 md:order-1 md:col-span-7 lg:col-span-8 flex flex-col justify-center space-y-1 sm:space-y-2">
+                      <div>
+                        <h2
+                          className={`font-black tracking-tight text-[#221F28] leading-tight ${
+                            compact
+                              ? "text-sm sm:text-xl md:text-3xl"
+                              : "text-sm sm:text-2xl md:text-5xl"
+                          }`}
+                        >
+                          {slide.name}
+                        </h2>
+                        <p
+                          className={`mt-0.5 font-medium text-[#4A4652] line-clamp-2 leading-snug ${
+                            compact
+                              ? "max-w-lg text-[9.5px] sm:text-xs"
+                              : "max-w-xl text-[10px] sm:text-xs md:text-base sm:leading-relaxed"
+                          }`}
+                        >
+                          {slide.flavorDesc}
+                        </p>
+                      </div>
+
+                      {/* Recursos e Performance */}
+                      {!compact ? (
+                        <div className="hidden sm:flex flex-wrap items-center gap-2 pt-0.5 text-[11px] font-medium text-[#423E4B] sm:text-xs">
+                          {slide.features.map((feature, fIdx) => (
+                            <div key={feature} className="flex items-center gap-1.5">
+                              {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
+                              <span className="flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#A855F7] shadow-[0_0_6px_rgba(168,85,247,0.9)]" />
+                                {feature}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="hidden sm:flex flex-wrap items-center gap-2 pt-0.5 text-[10px] font-medium text-[#423E4B]">
+                          {slide.features.slice(0, 2).map((feature, fIdx) => (
+                            <div key={feature} className="flex items-center gap-1">
+                              {fIdx > 0 && <span className="text-[#8B8694]">•</span>}
+                              <span className="h-1 w-1 rounded-full bg-[#A855F7]" />
+                              <span>{feature}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Botão de ação direta para o produto */}
+                      <div className="pt-0.5 flex items-center gap-2">
+                        <a
+                          href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
+                          aria-label={`Conheça o lançamento ${slide.name}`}
+                          className={`inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#A84CFF] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,76,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,76,255,0.5)] cursor-pointer whitespace-nowrap w-fit max-w-full ${
+                            compact
+                              ? "px-2 py-0.5 text-[9px]"
+                              : "px-2.5 py-1 text-[10px] sm:px-5 sm:py-2.5 sm:text-sm md:px-6 md:py-2.5"
+                          }`}
+                        >
+                          <Sparkles className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0 text-amber-300" />
+                          <span className="inline md:hidden">{slide.buttonText || "Conferir novidade"}</span>
+                          <span className="hidden md:inline">{slide.buttonText || "Conheça o lançamento"}</span>
+                          <ArrowRight className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
