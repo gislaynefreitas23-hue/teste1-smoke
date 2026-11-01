@@ -205,7 +205,7 @@ describe("Etapa 2 — Passo 5: Correção dos Estados Incorretos de Carregamento
 
     // Garante que o erro temporário de hooks em MobileLaunchHeader foi eliminado
     expect(screen.queryByText(/Esta página não carregou/i)).toBeNull();
-    expect(screen.getByText(/Nossos produtos/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Catálogo" })).toBeInTheDocument();
 
     // 2. Navega para Carrinho
     await act(async () => {
@@ -228,7 +228,7 @@ describe("Etapa 2 — Passo 5: Correção dos Estados Incorretos de Carregamento
       </QueryClientProvider>
     );
 
-    expect(screen.getByText("Nossos produtos")).toBeInTheDocument();
+    expect(screen.getByText("Catálogo")).toBeInTheDocument();
     // Não exibe mensagem de erro nem trava a interface
     expect(screen.queryByText("Não foi possível carregar o catálogo no momento.")).toBeNull();
   });

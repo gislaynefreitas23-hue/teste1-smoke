@@ -346,48 +346,36 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
             </h1>
           </div>
 
-          {/* Bloco de Preços e Promoção */}
-          <div className="rounded-2xl border border-primary/30 bg-gradient-to-br from-card/90 via-card/50 to-primary/5 p-5 backdrop-blur-md space-y-3">
+          {/* Bloco Informativo de Preços e Promoção com fundo lilás acinzentado (#D8D5DC) */}
+          <div
+            className="rounded-2xl border border-[#BDB6C8]/80 p-5 shadow-[0_8px_20px_rgba(16,16,24,0.12)] space-y-3.5 transition-colors duration-300"
+            style={{
+              background: "linear-gradient(145deg, #E2DFE8 0%, #D8D5DC 55%, #CDC8D5 100%)",
+            }}
+          >
             <div className="flex items-baseline gap-3 flex-wrap">
               {originalPrice && (
-                <span className="text-lg text-muted-foreground line-through font-medium">
+                <span className="text-base sm:text-lg text-slate-600 line-through font-medium">
                   {formatBRL(originalPrice)}
                 </span>
               )}
-              <span className="text-3xl sm:text-4xl font-extrabold text-ember tracking-tight">
+              <span className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
                 {formatBRL(currentPrice)}
               </span>
 
               {originalPrice && (
-                <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300 border border-amber-500/30">
+                <span className="rounded-md bg-emerald-600/15 border border-emerald-700/30 px-2 py-0.5 text-xs font-bold text-emerald-900 shadow-xs">
                   Economize {formatBRL(originalPrice - currentPrice)}
                 </span>
               )}
             </div>
 
             {/* Aviso de Cashback */}
-            <div className="flex items-center gap-2 rounded-xl bg-primary/10 border border-primary/20 p-2.5 text-xs text-primary-foreground">
-              <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+            <div className="flex items-center gap-2 rounded-xl bg-white/70 border border-[#BDB6C8]/70 p-2.5 text-xs text-slate-800 shadow-xs">
+              <Sparkles className="h-4 w-4 text-purple-700 shrink-0" />
               <span>
-                Ganhe <strong>{formatBRL(cashbackEstimated)}</strong> (5% em cashback) ao receber seu pedido.
+                Ganhe <strong className="text-purple-950 font-bold">{formatBRL(cashbackEstimated)}</strong> (5% em cashback) ao receber seu pedido.
               </span>
-            </div>
-
-            {/* Praça de Entrega */}
-            <div className="flex items-center justify-between text-xs pt-1 border-t border-border/40">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5 text-primary" />
-                <span>
-                  Praça ativa: <strong className="text-foreground">{selectedCity?.name || "Cuiabá"}</strong>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => openSelector()}
-                className="text-primary hover:underline font-semibold cursor-pointer"
-              >
-                Trocar cidade
-              </button>
             </div>
           </div>
 

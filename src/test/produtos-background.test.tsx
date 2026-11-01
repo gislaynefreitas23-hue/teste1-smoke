@@ -54,7 +54,7 @@ describe("Visual da Página de Produtos (/produtos)", () => {
       </QueryClientProvider>
     );
 
-    const heading = screen.getByRole("heading", { name: /Nossos produtos/i });
+    const heading = screen.getByRole("heading", { name: /Catálogo/i });
     expect(heading).toBeInTheDocument();
     expect(heading.className).toContain("text-slate-900");
   });

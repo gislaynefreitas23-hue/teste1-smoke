@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { MapPin, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/ProductCard";
@@ -43,7 +43,7 @@ function Produtos() {
   const childMatches = useSafeChildMatches();
   const hasChild = Boolean(childMatches && childMatches.length > 0);
 
-  const { selectedCity, selectedCityId, openSelector } = useCity();
+  const { selectedCityId } = useCity();
   const currentCity = selectedCityId || "cuiaba";
 
   const { data: products = [], isLoading, isError, refetch } = useQuery(productsQueryOptions(currentCity));
@@ -88,42 +88,16 @@ function Produtos() {
           "linear-gradient(145deg, #D4D0DA 0%, #E2DFE7 30%, #D4D0DA 58%, #C7B9D8 85%, #E8E0F0 100%)",
       }}
     >
-      <main className="mx-auto max-w-6xl px-4 py-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Nossos produtos</h1>
-            <p className="mt-1 text-sm font-medium text-slate-700">
-              Escolha, adicione ao carrinho e finalize pelo WhatsApp ou checkout online.
-            </p>
-          </div>
-
-          {/* Badge da Região Atual com Botão de Troca */}
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-purple-900/20 bg-slate-950/85 px-4 py-2 text-xs backdrop-blur-md shadow-lg">
-            <MapPin className="h-4 w-4 text-primary shrink-0" />
-            <div>
-              <span className="font-bold text-white">
-                {currentCity === "sao-paulo" ? "São Paulo — SP" : "Cuiabá — MT"}
-              </span>
-              <span className="mx-1.5 text-slate-400">•</span>
-              <span className="text-slate-300">
-                {currentCity === "sao-paulo" ? "Envios expressos SP" : "Entrega rápida local"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => openSelector()}
-              className="ml-2 font-bold text-purple-400 underline underline-offset-2 hover:text-purple-300 cursor-pointer"
-            >
-              Trocar
-            </button>
-          </div>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+        <div className="mb-4 sm:mb-5">
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">Catálogo</h1>
         </div>
 
         {/* Banner de Destaques em Carrossel */}
-        <ProductBannerCarousel />
+        <ProductBannerCarousel className="my-3 sm:my-4" />
 
         {/* Barra de Busca e Categorias */}
-        <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+        <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
           <div className="flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
@@ -171,7 +145,7 @@ function Produtos() {
             <p className="text-slate-700 font-medium">Nenhum produto encontrado nesta busca para esta cidade.</p>
           </div>
         ) : (
-          <div className="mt-8 grid grid-cols-2 gap-2.5 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch justify-center">
+          <div className="mt-5 sm:mt-6 grid grid-cols-2 gap-2.5 sm:gap-5 sm:grid-cols-2 lg:grid-cols-3 items-stretch justify-center">
             {visible.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}
@@ -179,7 +153,7 @@ function Produtos() {
         )}
 
         {/* Seção alternativa de Pedido pelo WhatsApp */}
-        <WhatsAppOrderSection className="mt-14" />
+        <WhatsAppOrderSection className="mt-10 sm:mt-12" />
       </main>
     </div>
   );

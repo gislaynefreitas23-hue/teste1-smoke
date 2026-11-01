@@ -117,7 +117,7 @@ describe("Etapa 2 — Passo 6: Navegação entre Catálogo, Produtos Individuais
     expect(screen.getAllByText("EBCREATE BC Pro 40K - Aurora Berries").length).toBeGreaterThan(0);
 
     // Garante que o carrossel do catálogo NÃO está sendo renderizado no lugar da página de detalhes
-    expect(screen.queryByText("Nossos produtos")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Catálogo" })).toBeNull();
   });
 
   it("4. Navegação do CTA do Banner para o produto Aurora Berries abre os detalhes corretos", async () => {
@@ -226,7 +226,7 @@ describe("Etapa 2 — Passo 6: Navegação entre Catálogo, Produtos Individuais
     await act(async () => {
       await router.navigate({ to: "/produtos" });
     });
-    expect(screen.getByText("Nossos produtos")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Catálogo" })).toBeInTheDocument();
     expect(screen.queryByText("Voltar ao Catálogo")).toBeNull();
   });
 
