@@ -147,6 +147,10 @@
   background-image: var(--gradient-ember);
 }
 
+@utility bg-product-lavanda {
+  background: linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%);
+}
+
 @utility text-ember {
   background-image: var(--gradient-ember);
   -webkit-background-clip: text;

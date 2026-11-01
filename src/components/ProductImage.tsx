@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { resolveProductImage } from "@/lib/brasa";
+import { formatBRL, resolveProductImage, PRODUCT_IMAGE_BG_GRADIENT } from "@/lib/brasa";
 import { getTransparentPodAsset, removeWhiteBackgroundClientSide } from "@/lib/image-processing";
 
 export interface ProductImageProps {
@@ -16,12 +16,13 @@ export interface ProductImageProps {
   priority?: boolean;
   aspectRatio?: "square" | "video" | "auto" | "banner";
   showPlaceholderName?: boolean;
+  useLavandaGradient?: boolean;
 }
 
 /**
  * Componente padronizado e reutilizável para exibição de imagens na Pantanal Smoke.
- * Garante que produtos e montagens visuais se integrem naturalmente ao fundo escuro e roxo,
- * sem molduras brancas artificiais, sem caixas e preservando a qualidade e proporção original.
+ * Garante que produtos e montagens visuais se integrem perfeitamente ao fundo escuro e roxo
+ * ou ao gradiente padronizado Lavanda Metálico, preservando a qualidade e proporção original.
  */
 export function ProductImage({
   src,
@@ -35,6 +36,7 @@ export function ProductImage({
   priority = false,
   aspectRatio = "square",
   showPlaceholderName = true,
+  useLavandaGradient = false,
 }: ProductImageProps) {
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -126,12 +128,14 @@ export function ProductImage({
     <div
       className={cn(
         "relative w-full overflow-hidden flex items-center justify-center select-none",
+        useLavandaGradient && "border border-white/20 bg-product-lavanda",
         aspectClass,
         containerClassName
       )}
+      style={useLavandaGradient ? { background: PRODUCT_IMAGE_BG_GRADIENT } : undefined}
     >
-      {/* Brilho neon difuso roxo de fundo integrado, sem quadrado ou caixa sólida */}
-      {glowEffect && (
+      {/* Brilho neon difuso roxo de fundo integrado quando não usa gradiente lavanda */}
+      {glowEffect && !useLavandaGradient && (
         <div
           className="pointer-events-none absolute inset-0 -m-4 rounded-full opacity-40 blur-2xl transition-all duration-500"
           style={{ background: glowColor }}

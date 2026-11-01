@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getPaymentProvider } from "./adapter";
+import { validateAddressForPlaza } from "@/lib/city-address-validation";
 import type {
   OrderAddress,
   OrderCustomer,
@@ -177,6 +178,15 @@ export async function processCheckout(
     throw new Error("Por favor, preencha o endereço completo de entrega.");
   }
 
+  const targetCity = payload.selectedCityId === "sao-paulo" ? "sao-paulo" : "cuiaba";
+  const addressValidation = validateAddressForPlaza(payload.address, targetCity);
+  if (!addressValidation.isValid) {
+    throw new Error(
+      addressValidation.errorMessage ||
+        "O endereço de entrega informado não pertence à praça selecionada."
+    );
+  }
+
   // 4. Cálculo e validação oficial de preços no servidor
   const summary = await calculateOrderSummary(
     payload.items,
@@ -219,7 +229,15 @@ export async function processCheckout(
 
     if (!error && data && (data as { id?: string }).id) {
       orderId = (data as { id: string }).id;
-    } else {
+    } else if (error) {
+      if (
+        error.message &&
+        (error.message.includes("incompativel") ||
+          error.message.includes("inativo") ||
+          error.message.includes("vazio"))
+      ) {
+        throw new Error(error.message);
+      }
       // Fallback seguro: inserção direta caso o RPC falhe ou rejeite visitantes
       await (supabase.from("orders") as any).insert({
         id: orderId,

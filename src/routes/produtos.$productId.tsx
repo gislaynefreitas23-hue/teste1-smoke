@@ -245,25 +245,31 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-start">
         {/* Coluna Esquerda: Imagem em Destaque */}
         <div className="space-y-4">
-          <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-primary/25 bg-card/60 p-6 flex items-center justify-center shadow-2xl backdrop-blur-md">
-            {/* Brilho neon difuso roxo de fundo integrado */}
+          <div
+            className="relative aspect-square w-full overflow-hidden rounded-3xl border border-white/20 p-6 flex items-center justify-center shadow-2xl transition-colors duration-300 bg-product-lavanda"
+            style={{ background: "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)" }}
+          >
+            {/* Iluminação suave e radial para acabamento de estúdio */}
             <div
-              className="pointer-events-none absolute inset-0 -m-8 rounded-full opacity-45 blur-3xl transition-all duration-500"
-              style={{ background: "rgba(168, 85, 247, 0.3)" }}
+              className="pointer-events-none absolute inset-0 opacity-40"
+              style={{
+                background:
+                  "radial-gradient(circle at center, rgba(255, 255, 255, 0.5) 0%, transparent 75%)",
+              }}
               aria-hidden="true"
             />
 
             {/* Badges de Destaque */}
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
               {product.badge === "lancamento" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/25 to-ember/40 border border-amber-500/60 px-3 py-1 text-xs font-bold text-amber-300 shadow-glow backdrop-blur-md">
-                  <Sparkles className="h-3.5 w-3.5 text-ember" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#101018]/90 border border-amber-400/50 px-3 py-1 text-xs font-bold text-amber-300 shadow-md backdrop-blur-md">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400" />
                   LANÇAMENTO EXCLUSIVO
                 </span>
               )}
               {product.badge === "promocao" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500/25 to-orange-500/40 border border-rose-500/60 px-3 py-1 text-xs font-bold text-rose-300 shadow-glow backdrop-blur-md">
-                  <Zap className="h-3.5 w-3.5 text-orange-400" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#101018]/90 border border-rose-400/50 px-3 py-1 text-xs font-bold text-rose-300 shadow-md backdrop-blur-md">
+                  <Zap className="h-3.5 w-3.5 text-rose-400" />
                   SUPER PROMOÇÃO
                 </span>
               )}
@@ -271,8 +277,8 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
 
             {/* Badge de Praça / Cidade */}
             <div className="absolute top-4 right-4 z-10">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-card/95 px-3 py-1 text-xs font-semibold text-primary backdrop-blur-md shadow-md">
-                <MapPin className="h-3.5 w-3.5" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-[#101018]/90 px-3 py-1 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-md">
+                <MapPin className="h-3.5 w-3.5 text-[#A84CFF]" />
                 {currentCity === "sao-paulo" ? "São Paulo — SP" : "Cuiabá — MT"}
               </span>
             </div>
@@ -281,13 +287,13 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
               <img
                 src={resolvedImage}
                 alt={product.name}
-                className="relative z-10 h-full w-full object-contain p-4 drop-shadow-[0_16px_36px_rgba(0,0,0,0.6)] transition-transform duration-500 hover:scale-105"
+                className="relative z-10 h-full w-full max-h-[90%] max-w-[90%] object-contain object-center drop-shadow-[0_16px_36px_rgba(0,0,0,0.35)] transition-transform duration-500 hover:scale-105"
               />
             ) : (
-              <div className="flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
-                <Package className="h-16 w-16 mb-2 text-primary/40" />
+              <div className="flex flex-col items-center justify-center text-slate-700 p-8 text-center">
+                <Package className="h-16 w-16 mb-2 text-[#A84CFF]/40" />
                 <span className="text-sm font-semibold">{product.name}</span>
-                <span className="text-xs text-muted-foreground mt-1">Pantanal Smoke Original</span>
+                <span className="text-xs text-slate-600 mt-1">Pantanal Smoke Original</span>
               </div>
             )}
           </div>

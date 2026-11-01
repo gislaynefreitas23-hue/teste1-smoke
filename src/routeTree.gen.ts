@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CarrinhoRouteImport } from './routes/carrinho'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContaRouteImport } from './routes/conta'
+import { Route as DesignLabRouteImport } from './routes/design-lab'
 import { Route as PerguntasFrequentesRouteImport } from './routes/perguntas-frequentes'
 import { Route as ProdutosRouteImport } from './routes/produtos'
 import { Route as RecomendarRouteImport } from './routes/recomendar'
@@ -50,6 +51,11 @@ const CheckoutRoute = CheckoutRouteImport.update({
 const ContaRoute = ContaRouteImport.update({
   id: '/conta',
   path: '/conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DesignLabRoute = DesignLabRouteImport.update({
+  id: '/design-lab',
+  path: '/design-lab',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PerguntasFrequentesRoute = PerguntasFrequentesRouteImport.update({
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/carrinho': typeof CarrinhoRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/design-lab': typeof DesignLabRoute
   '/perguntas-frequentes': typeof PerguntasFrequentesRoute
   '/produtos': typeof ProdutosRouteWithChildren
   '/recomendar': typeof RecomendarRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/carrinho': typeof CarrinhoRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/design-lab': typeof DesignLabRoute
   '/perguntas-frequentes': typeof PerguntasFrequentesRoute
   '/produtos': typeof ProdutosRouteWithChildren
   '/recomendar': typeof RecomendarRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/carrinho': typeof CarrinhoRoute
   '/checkout': typeof CheckoutRoute
   '/conta': typeof ContaRoute
+  '/design-lab': typeof DesignLabRoute
   '/perguntas-frequentes': typeof PerguntasFrequentesRoute
   '/produtos': typeof ProdutosRouteWithChildren
   '/recomendar': typeof RecomendarRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/carrinho'
     | '/checkout'
     | '/conta'
+    | '/design-lab'
     | '/perguntas-frequentes'
     | '/produtos'
     | '/recomendar'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/carrinho'
     | '/checkout'
     | '/conta'
+    | '/design-lab'
     | '/perguntas-frequentes'
     | '/produtos'
     | '/recomendar'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/carrinho'
     | '/checkout'
     | '/conta'
+    | '/design-lab'
     | '/perguntas-frequentes'
     | '/produtos'
     | '/recomendar'
@@ -178,6 +190,7 @@ export interface RootRouteChildren {
   CarrinhoRoute: typeof CarrinhoRoute
   CheckoutRoute: typeof CheckoutRoute
   ContaRoute: typeof ContaRoute
+  DesignLabRoute: typeof DesignLabRoute
   PerguntasFrequentesRoute: typeof PerguntasFrequentesRoute
   ProdutosRoute: typeof ProdutosRouteWithChildren
   RecomendarRoute: typeof RecomendarRoute
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/conta'
       fullPath: '/conta'
       preLoaderRoute: typeof ContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/design-lab': {
+      id: '/design-lab'
+      path: '/design-lab'
+      fullPath: '/design-lab'
+      preLoaderRoute: typeof DesignLabRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/perguntas-frequentes': {
@@ -293,6 +313,7 @@ const rootRouteChildren: RootRouteChildren = {
   CarrinhoRoute: CarrinhoRoute,
   CheckoutRoute: CheckoutRoute,
   ContaRoute: ContaRoute,
+  DesignLabRoute: DesignLabRoute,
   PerguntasFrequentesRoute: PerguntasFrequentesRoute,
   ProdutosRoute: ProdutosRouteWithChildren,
   RecomendarRoute: RecomendarRoute,

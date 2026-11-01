@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   Bookmark,
   Briefcase,
   Check,
@@ -53,6 +54,10 @@ import {
   processCheckout,
   type CheckoutResponse,
 } from "@/lib/payment/service";
+import {
+  validateAddressForPlaza,
+  type AddressValidationResult,
+} from "@/lib/city-address-validation";
 import type { PaymentMethod, DeliveryPaymentType } from "@/lib/payment/types";
 
 export const Route = createFileRoute("/checkout")({
@@ -68,10 +73,10 @@ export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
 });
 
-function CheckoutPage() {
+export function CheckoutPage() {
   const { items, clear, cartCityId } = useCart();
   const { session } = useAuthSession();
-  const { selectedCity, selectedCityId } = useCity();
+  const { selectedCity, selectedCityId, selectCity } = useCity();
 
   // Cidade e estado definidos no site
   const defaultCity =
@@ -98,6 +103,7 @@ function CheckoutPage() {
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isAddressConfirmed, setIsAddressConfirmed] = useState(false);
+  const [incompatibleLocationAlert, setIncompatibleLocationAlert] = useState<AddressValidationResult | null>(null);
 
   // Campos específicos solicitados: CEP, RUA, BAIRRO, NUMERO
   const [cep, setCep] = useState("");
@@ -212,6 +218,19 @@ function CheckoutPage() {
   }, [session, targetCityId]);
 
   function handleSelectSavedAddress(addr: CustomerAddress) {
+    const validation = validateAddressForPlaza(
+      { cidade: addr.cidade, uf: addr.uf, cep: addr.cep },
+      targetCityId
+    );
+
+    if (!validation.isValid) {
+      setIsAddressConfirmed(false);
+      setIncompatibleLocationAlert(validation);
+      setFormError(validation.errorMessage || "Este endereço salvo não pertence à praça ativa.");
+      return;
+    }
+
+    setIncompatibleLocationAlert(null);
     setSelectedAddressId(addr.id);
     setCep(addr.cep);
     setRua(addr.rua);
@@ -334,6 +353,7 @@ function CheckoutPage() {
 
     setIsSearchingLocation(true);
     setLocationError(null);
+    setIncompatibleLocationAlert(null);
 
     try {
       const cleanCep = query.replace(/\D/g, "");
@@ -341,6 +361,26 @@ function CheckoutPage() {
         const resCep = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
         const dataCep = await resCep.json();
         if (!dataCep.erro) {
+          const validation = validateAddressForPlaza(
+            {
+              cidade: dataCep.localidade,
+              uf: dataCep.uf,
+              cep: cleanCep,
+              rua: dataCep.logradouro,
+              bairro: dataCep.bairro,
+            },
+            targetCityId
+          );
+
+          if (!validation.isValid) {
+            setIsAddressConfirmed(false);
+            setIncompatibleLocationAlert(validation);
+            setLocationError(validation.errorMessage || "CEP incompatível com a praça selecionada.");
+            setIsSearchingLocation(false);
+            return;
+          }
+
+          setIncompatibleLocationAlert(null);
           if (dataCep.logradouro) setRua(dataCep.logradouro);
           if (dataCep.bairro) setBairro(dataCep.bairro);
           setCep(`${cleanCep.slice(0, 5)}-${cleanCep.slice(5)}`);
@@ -375,11 +415,27 @@ function CheckoutPage() {
       }
 
       const item = data[0];
+      const city = item.address?.city || item.address?.town || item.address?.municipality || "";
+      const uf = (item.address?.["ISO3166-2-lvl4"] || "").replace("BR-", "") || item.address?.state || "";
+      const postcode = item.address?.postcode || "";
+
+      const validation = validateAddressForPlaza(
+        { cidade: city, uf, cep: postcode },
+        targetCityId
+      );
+
+      if (!validation.isValid) {
+        setIsAddressConfirmed(false);
+        setIncompatibleLocationAlert(validation);
+        setLocationError(validation.errorMessage || "Endereço incompatível com a praça selecionada.");
+        return;
+      }
+
+      setIncompatibleLocationAlert(null);
       setCoords({ lat: parseFloat(item.lat), lng: parseFloat(item.lon) });
 
       const road = item.address?.road || item.address?.pedestrian || item.address?.street || "";
       const suburb = item.address?.suburb || item.address?.neighbourhood || item.address?.city_district || "";
-      const postcode = item.address?.postcode || "";
       const houseNumber = item.address?.house_number || "";
 
       if (road) setRua(road);
@@ -404,6 +460,7 @@ function CheckoutPage() {
 
     setIsLocating(true);
     setLocationError(null);
+    setIncompatibleLocationAlert(null);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -420,13 +477,45 @@ function CheckoutPage() {
             const suburb = data.address.suburb || data.address.neighbourhood || "";
             const postcode = data.address.postcode || "";
             const houseNumber = data.address.house_number || "";
+            const detectedCity =
+              data.address.city ||
+              data.address.town ||
+              data.address.municipality ||
+              data.address.village ||
+              "";
+            const detectedUf =
+              (data.address["ISO3166-2-lvl4"] || "").replace("BR-", "") ||
+              data.address.state ||
+              "";
 
+            const validation = validateAddressForPlaza(
+              {
+                cidade: detectedCity,
+                uf: detectedUf,
+                cep: postcode,
+                state: data.address.state,
+                rua: road,
+                bairro: suburb,
+              },
+              targetCityId
+            );
+
+            if (!validation.isValid) {
+              setIsAddressConfirmed(false);
+              setIncompatibleLocationAlert(validation);
+              setLocationError(null);
+              return;
+            }
+
+            setIncompatibleLocationAlert(null);
             if (road) setRua(road);
             if (suburb) setBairro(suburb);
             if (postcode) setCep(postcode);
             if (houseNumber) setNumero(houseNumber);
+            setIsAddressConfirmed(true);
+          } else {
+            setIsAddressConfirmed(true);
           }
-          setIsAddressConfirmed(true);
         } catch {
           setIsAddressConfirmed(true);
         } finally {
@@ -446,6 +535,31 @@ function CheckoutPage() {
       { timeout: 10000, enableHighAccuracy: true }
     );
   }
+
+  // Revalidação automática quando a praça ou o endereço informado forem alterados
+  useEffect(() => {
+    if (cep.trim() || rua.trim()) {
+      const validation = validateAddressForPlaza(
+        {
+          cep,
+          rua,
+          bairro,
+          cidade: defaultCity,
+          uf: defaultUf,
+        },
+        targetCityId
+      );
+
+      if (!validation.isValid) {
+        setIsAddressConfirmed(false);
+        setIncompatibleLocationAlert(validation);
+      } else {
+        if (incompatibleLocationAlert && incompatibleLocationAlert.targetCityId === targetCityId) {
+          setIncompatibleLocationAlert(null);
+        }
+      }
+    }
+  }, [targetCityId, cep, rua, bairro]);
 
   // Submissão do Checkout
   async function handleSubmitCheckout(e: React.FormEvent) {
@@ -479,6 +593,28 @@ function CheckoutPage() {
 
     if (!numero.trim()) {
       setFormError("Informe o número do imóvel.");
+      return;
+    }
+
+    // Validação estrita de compatibilidade entre endereço informado e praça ativa
+    const addressValidation = validateAddressForPlaza(
+      {
+        cep,
+        rua,
+        numero,
+        bairro,
+        cidade: defaultCity,
+        uf: defaultUf,
+      },
+      targetCityId
+    );
+
+    if (!addressValidation.isValid) {
+      setIncompatibleLocationAlert(addressValidation);
+      setFormError(
+        addressValidation.errorMessage ||
+          `O endereço informado não pertence à praça selecionada (${defaultCity}/${defaultUf}). Altere a praça ou digite outro endereço.`
+      );
       return;
     }
 
@@ -1134,6 +1270,67 @@ function CheckoutPage() {
                       </p>
                     )}
 
+                    {/* Alerta de Incompatibilidade de Localização com a Praça Ativa */}
+                    {incompatibleLocationAlert && (
+                      <div
+                        data-testid="incompatible-location-alert"
+                        className="rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/40 via-amber-900/20 to-slate-900/80 p-4 text-xs text-amber-200 shadow-xl space-y-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
+                            <AlertTriangle className="h-4 w-4" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="font-bold text-amber-300 text-sm">
+                              Localização incompatível com a praça ativa
+                            </p>
+                            <p className="text-slate-200 text-xs leading-relaxed">
+                              {incompatibleLocationAlert.errorMessage}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20">
+                          {incompatibleLocationAlert.detectedCityId &&
+                            incompatibleLocationAlert.detectedCityId !== "other" && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => {
+                                  const target = incompatibleLocationAlert.detectedCityId as "cuiaba" | "sao-paulo";
+                                  setIncompatibleLocationAlert(null);
+                                  setLocationError(null);
+                                  selectCity(target);
+                                }}
+                                className="bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs gap-1.5 shadow-md"
+                              >
+                                <Compass className="h-3.5 w-3.5" />
+                                Trocar para {incompatibleLocationAlert.detectedCityName}
+                              </Button>
+                            )}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setIncompatibleLocationAlert(null);
+                              setLocationError(null);
+                              setIsManualAddressMode(true);
+                              setCep("");
+                              setRua("");
+                              setBairro("");
+                              setNumero("");
+                            }}
+                            className="border-slate-700 hover:bg-slate-800 text-slate-200 text-xs gap-1.5"
+                          >
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                            Digitar outro endereço em {incompatibleLocationAlert.targetCityName}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Mapa Interativo */}
                     {!isAddressConfirmed ? (
                       <div className="space-y-3">
@@ -1196,7 +1393,28 @@ function CheckoutPage() {
                           value={cep}
                           maxLength={9}
                           onChange={(e) => setCep(e.target.value)}
-                          placeholder="78000-000"
+                          onBlur={async () => {
+                            const clean = cep.replace(/\D/g, "");
+                            if (clean.length === 8) {
+                              const check = validateAddressForPlaza({ cep: clean }, targetCityId);
+                              if (!check.isValid) {
+                                setIncompatibleLocationAlert(check);
+                                setIsAddressConfirmed(false);
+                                return;
+                              }
+                              try {
+                                const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+                                const data = await res.json();
+                                if (!data.erro) {
+                                  if (!rua && data.logradouro) setRua(data.logradouro);
+                                  if (!bairro && data.bairro) setBairro(data.bairro);
+                                }
+                              } catch {
+                                // ignora erro de rede no blur
+                              }
+                            }
+                          }}
+                          placeholder={targetCityId === "sao-paulo" ? "01310-100" : "78000-000"}
                           className="mt-1 text-sm font-mono"
                         />
                       </div>
@@ -1685,16 +1903,21 @@ function CheckoutItemThumbnail({
   }, [id, imageUrl, name]);
 
   return (
-    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/80 p-0.5 flex items-center justify-center relative">
+    <div
+      className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-white/20 p-0.5 flex items-center justify-center relative shadow-xs bg-product-lavanda"
+      style={{
+        background: "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)",
+      }}
+    >
       {image ? (
         <img
           src={image}
           alt={name}
-          className="h-full w-full object-contain drop-shadow-xs"
+          className="max-h-[92%] max-w-[92%] object-contain object-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]"
           loading="lazy"
         />
       ) : (
-        <div className="text-[9px] text-muted-foreground font-medium text-center">
+        <div className="text-[9px] text-slate-700 font-medium text-center">
           {name.slice(0, 4)}
         </div>
       )}

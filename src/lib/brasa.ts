@@ -11,6 +11,10 @@ export const WHATSAPP_NUMBER = "5565999210066";
 /** Percentual devolvido em cashback quando a loja confirma a entrega. */
 export const CASHBACK_RATE = 0.05;
 
+/** Fundo padronizado Lavanda Metálico para todas as imagens de produtos. */
+export const PRODUCT_IMAGE_BG_GRADIENT =
+  "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)";
+
 /** Taxa fixa de entrega obrigatória para Cuiabá (R$ 10,00). */
 export const TAXA_ENTREGA_CUIABA = 10.0;
 

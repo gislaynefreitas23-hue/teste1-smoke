@@ -229,22 +229,20 @@ export function ProductCard({
       }}
       aria-label={`Ver detalhes do produto ${product.name}`}
     >
-      {/* 2. ÁREA DA IMAGEM: Base escura de contraste (#101018) com brilho suave atrás */}
-      <div className="relative w-full aspect-square overflow-hidden flex items-center justify-center p-3 sm:p-4 bg-gradient-to-b from-[#101018] to-[#151222] border-b border-[#352347]/60">
-        {/* Iluminação suave e orgânica atrás da imagem com as cores do produto */}
+      {/* 2. ÁREA DA IMAGEM: Fundo Padronizado Lavanda Metálico (#E9E5EC -> #D8D5DC -> #BDB8C5) */}
+      <div
+        className="relative w-full aspect-square overflow-hidden flex items-center justify-center p-2.5 sm:p-3.5 border-b border-[#352347]/60 transition-colors duration-300 bg-product-lavanda"
+        style={{ background: "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)" }}
+      >
+        {/* Iluminação suave e radial para acabamento acetinado de profundidade */}
         <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center transition-all duration-500 group-hover:scale-110"
+          className="pointer-events-none absolute inset-0 opacity-35"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(255, 255, 255, 0.45) 0%, transparent 75%)",
+          }}
           aria-hidden="true"
-        >
-          <div
-            className="h-24 w-24 sm:h-36 sm:w-36 rounded-full blur-2xl opacity-65 group-hover:opacity-90 transition-opacity duration-300"
-            style={{
-              background: glow.secondary
-                ? `radial-gradient(circle, ${glow.primary} 0%, ${glow.secondary} 55%, transparent 75%)`
-                : `radial-gradient(circle, ${glow.primary} 0%, transparent 70%)`,
-            }}
-          />
-        </div>
+        />
 
         {/* 1. BADGE DE DESTAQUE: Lançamento ou Promoção (Canto superior esquerdo) */}
         {(showLaunch || showPromo) && (
@@ -264,7 +262,7 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Imagem do Produto: proporção padronizada, centralizada e integrada sem distorções */}
+        {/* Imagem do Produto: proporção padronizada, centralizada e integrada sem distorções ou cortes */}
         <div className="relative z-10 flex h-full w-full items-center justify-center p-1 sm:p-2">
           {image ? (
             <img
@@ -273,17 +271,17 @@ export function ProductCard({
               loading="lazy"
               width={600}
               height={600}
-              className="h-full w-full max-h-[85%] max-w-[85%] object-contain object-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.65)] transition-transform duration-300 group-hover:scale-105"
+              className="h-full w-full max-h-[88%] max-w-[88%] object-contain object-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-center px-2 text-xs sm:text-sm text-[#C9C3D5]">
+            <div className="flex h-full w-full items-center justify-center text-center px-2 text-xs sm:text-sm text-slate-700 font-medium">
               {product.name}
             </div>
           )}
         </div>
 
         {/* Efeito sutil de hover para desktop */}
-        <div className="pointer-events-none absolute inset-0 hidden sm:flex items-center justify-center bg-[#101018]/40 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 group-hover:opacity-100 z-20">
+        <div className="pointer-events-none absolute inset-0 hidden sm:flex items-center justify-center bg-[#101018]/30 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 group-hover:opacity-100 z-20">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1D1929]/95 border border-[#A84CFF]/60 px-3 py-1 text-xs font-semibold text-white shadow-lg">
             <Eye className="h-3.5 w-3.5 text-[#A84CFF]" />
             Ver Detalhes

@@ -399,17 +399,22 @@ function CartItemRow({
   return (
     <li className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5">
       <div className="flex items-center gap-3.5 min-w-0 flex-1">
-        {/* Imagem do Produto */}
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/60 relative flex items-center justify-center p-1">
+        {/* Imagem do Produto com fundo padronizado Lavanda Metálico */}
+        <div
+          className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/20 relative flex items-center justify-center p-1.5 shadow-sm bg-product-lavanda"
+          style={{
+            background: "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)",
+          }}
+        >
           {image ? (
             <img
               src={image}
               alt={item.name}
-              className="h-full w-full object-contain drop-shadow-sm"
+              className="max-h-[92%] max-w-[92%] object-contain object-center drop-shadow-[0_4px_8px_rgba(0,0,0,0.25)]"
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-muted-foreground font-medium">
+            <div className="flex h-full w-full items-center justify-center p-1 text-center text-[10px] text-slate-700 font-medium">
               {item.name.slice(0, 10)}
             </div>
           )}

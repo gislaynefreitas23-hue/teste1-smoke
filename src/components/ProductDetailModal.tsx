@@ -92,25 +92,32 @@ export function ProductDetailModal({
       <DialogContent className="max-w-3xl overflow-hidden bg-background/95 p-0 border-primary/20 backdrop-blur-xl sm:rounded-2xl max-h-[92vh] flex flex-col">
         <div className="overflow-y-auto p-5 sm:p-7">
           <div className="grid gap-6 sm:grid-cols-2">
-            {/* Coluna da Imagem Ampliada */}
-            <div className="relative flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/70 p-4 min-h-[260px] sm:min-h-[360px] overflow-hidden">
-              {/* Brilho neon difuso roxo de fundo integrado */}
+            {/* Coluna da Imagem Ampliada com fundo padronizado Lavanda Metálico */}
+            <div
+              className="relative flex flex-col items-center justify-center rounded-2xl border border-slate-700/60 p-4 min-h-[260px] sm:min-h-[360px] overflow-hidden bg-product-lavanda"
+              style={{
+                background: "linear-gradient(145deg, #E9E5EC 0%, #D8D5DC 55%, #BDB8C5 100%)",
+              }}
+            >
+              {/* Iluminação de estúdio sutil para contraste */}
               <div
-                className="pointer-events-none absolute inset-0 -m-6 rounded-full opacity-35 blur-2xl"
-                style={{ background: "rgba(168, 85, 247, 0.25)" }}
+                className="pointer-events-none absolute inset-0 rounded-2xl opacity-40"
+                style={{
+                  background: "radial-gradient(circle at center, rgba(255, 255, 255, 0.45) 0%, transparent 75%)",
+                }}
                 aria-hidden="true"
               />
 
-              {/* Badges de Lançamento / Promoção sobre a imagem */}
-              <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5">
+              {/* Badges de Lançamento / Promoção sobre a imagem suspensas */}
+              <div className="absolute top-3 left-3 z-20 flex flex-col gap-1.5">
                 {product.badge === "lancamento" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-500/20 to-ember/30 border border-amber-500/50 px-2.5 py-1 text-[11px] font-bold text-amber-300 shadow-glow">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#101018]/90 border border-amber-500/50 px-2.5 py-1 text-[11px] font-bold text-amber-300 shadow-md backdrop-blur-md">
                     <Sparkles className="h-3.5 w-3.5 text-ember" />
                     LANÇAMENTO
                   </span>
                 )}
                 {product.badge === "promocao" && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-rose-500/20 to-orange-500/30 border border-rose-500/50 px-2.5 py-1 text-[11px] font-bold text-rose-300 shadow-glow">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#101018]/90 border border-rose-500/50 px-2.5 py-1 text-[11px] font-bold text-rose-300 shadow-md backdrop-blur-md">
                     <Zap className="h-3.5 w-3.5 text-orange-400" />
                     PROMOÇÃO
                   </span>
@@ -118,8 +125,8 @@ export function ProductDetailModal({
               </div>
 
               {/* Badge da Cidade */}
-              <div className="absolute top-3 right-3 z-10">
-                <span className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-card/90 px-2.5 py-1 text-[11px] font-semibold text-primary backdrop-blur-md shadow-xs">
+              <div className="absolute top-3 right-3 z-20">
+                <span className="inline-flex items-center gap-1 rounded-full border border-slate-700/80 bg-[#101018]/90 px-2.5 py-1 text-[11px] font-semibold text-primary backdrop-blur-md shadow-xs">
                   {targetCity === "sao-paulo" ? "São Paulo" : "Cuiabá"}
                 </span>
               </div>
@@ -129,14 +136,14 @@ export function ProductDetailModal({
                 <img
                   src={resolvedImage}
                   alt={product.name}
-                  className="relative z-10 max-h-[280px] sm:max-h-[340px] w-full object-contain drop-shadow-[0_14px_28px_rgba(0,0,0,0.55)] transition-transform duration-300 hover:scale-105"
+                  className="relative z-10 max-h-[88%] max-w-[88%] sm:max-h-[320px] w-auto object-contain object-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.30)] transition-transform duration-300 hover:scale-105"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
                       "https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=600&auto=format&fit=crop&q=80";
                   }}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+                <div className="flex flex-col items-center justify-center text-slate-700 p-8 text-center relative z-10">
                   <Package className="h-16 w-16 mb-2 text-primary/40" />
                   <p className="text-sm font-medium">{product.name}</p>
                 </div>
