@@ -96,22 +96,34 @@ describe("Limpeza Visual do Catálogo e Detalhes do Produto", () => {
       expect(detailContent).not.toContain("Trocar cidade");
     });
 
-    it("Card informativo de preço utiliza fundo lilás acinzentado (#D8D5DC) com tipografia de alto contraste", () => {
+    it("Removeu o indicador de texto 'Estoque disponível' e os 3 cards informativos", () => {
       const detailPath = path.resolve(__dirname, "../routes/produtos.$productId.tsx");
       const detailContent = fs.readFileSync(detailPath, "utf-8");
 
-      // Fundo lilás acinzentado
+      // Indicador de estoque removido
+      expect(detailContent).not.toContain("Em estoque (");
+      expect(detailContent).not.toContain("unidades disponíveis para pronta entrega");
+
+      // 3 cards informativos removidos
+      expect(detailContent).not.toContain("100% Original");
+      expect(detailContent).not.toContain("Envio Rápido");
+      expect(detailContent).not.toContain("Garantia de Qualidade");
+      expect(detailContent).not.toContain("Em todas as compras");
+    });
+
+    it("Unificou o preço no seletor de quantidade sem duplicação de preço isolado", () => {
+      const detailPath = path.resolve(__dirname, "../routes/produtos.$productId.tsx");
+      const detailContent = fs.readFileSync(detailPath, "utf-8");
+
+      // Fundo lilás acinzentado no card unificado de quantidade e valor
       expect(detailContent).toContain("#D8D5DC");
       expect(detailContent).toContain("linear-gradient(145deg, #E2DFE8 0%, #D8D5DC 55%, #CDC8D5 100%)");
 
       // Tipografia escura e legível sobre o fundo claro
       expect(detailContent).toContain("text-slate-950");
-      expect(detailContent).toContain("text-slate-600");
-      expect(detailContent).toContain("text-slate-800");
 
-      // Preserva cashback e economia
-      expect(detailContent).toContain("cashbackEstimated");
-      expect(detailContent).toContain("Economize");
+      // Verifica cálculo dinâmico de subtotal com formatBRL
+      expect(detailContent).toContain("formatBRL(subtotal)");
     });
 
     it("Preserva o gradiente Lavanda Metálico no contêiner da imagem do produto", () => {

@@ -208,7 +208,7 @@ describe("Página Individual de Detalhes do Produto & Fluxo de Compra", () => {
     expect(stored[0].id).toBe("prod-pod-ignite");
   });
 
-  it("5. Exibe informações de entrega e cashback de 5%", async () => {
+  it("5. Exibe informações de entrega e pagamento", async () => {
     renderProductPage();
 
     await waitFor(() => {
@@ -217,7 +217,6 @@ describe("Página Individual de Detalhes do Produto & Fluxo de Compra", () => {
       ).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/5% em cashback/i)).toBeInTheDocument();
     expect(screen.getByText(/Pagamento somente na entrega/i)).toBeInTheDocument();
   });
 

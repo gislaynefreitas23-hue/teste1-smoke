@@ -12,11 +12,8 @@ import {
   Minus,
   Package,
   Plus,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Truck,
-  Wallet,
   Zap,
 } from "lucide-react";
 
@@ -297,33 +294,13 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
               </div>
             )}
           </div>
-
-          {/* Selos de Confiança abaixo da Imagem */}
-          <div className="grid grid-cols-3 gap-2 text-center text-[11px] text-muted-foreground">
-            <div className="rounded-xl border border-border/40 bg-card/40 p-2.5 flex flex-col items-center justify-center">
-              <ShieldCheck className="h-4 w-4 text-emerald-400 mb-1" />
-              <span className="font-semibold text-foreground">100% Original</span>
-              <span className="text-[10px]">Garantia de Qualidade</span>
-            </div>
-            <div className="rounded-xl border border-border/40 bg-card/40 p-2.5 flex flex-col items-center justify-center">
-              <Truck className="h-4 w-4 text-primary mb-1" />
-              <span className="font-semibold text-foreground">Envio Rápido</span>
-              <span className="text-[10px]">
-                {currentCity === "cuiaba" ? "Taxa fixa R$ 10" : "Entrega Grátis SP"}
-              </span>
-            </div>
-            <div className="rounded-xl border border-border/40 bg-card/40 p-2.5 flex flex-col items-center justify-center">
-              <Wallet className="h-4 w-4 text-amber-400 mb-1" />
-              <span className="font-semibold text-foreground">5% Cashback</span>
-              <span className="text-[10px]">Em todas as compras</span>
-            </div>
-          </div>
         </div>
 
-        {/* Coluna Direita: Informações, Preços, Estoque e Ações de Compra */}
-        <div className="space-y-6">
+        {/* Coluna Direita: Informações, Descrição, Seletor de Quantidade/Valor e Compra */}
+        <div className="space-y-5">
+          {/* 2. Nome do Produto e Badges */}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <Badge variant="outline" className="text-xs font-semibold text-primary border-primary/30 uppercase tracking-wider">
                 {product.category}
               </Badge>
@@ -341,65 +318,14 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
               )}
             </div>
 
-            <h1 className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+            <h1 className="mt-2.5 text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
               {product.name}
             </h1>
           </div>
 
-          {/* Bloco Informativo de Preços e Promoção com fundo lilás acinzentado (#D8D5DC) */}
-          <div
-            className="rounded-2xl border border-[#BDB6C8]/80 p-5 shadow-[0_8px_20px_rgba(16,16,24,0.12)] space-y-3.5 transition-colors duration-300"
-            style={{
-              background: "linear-gradient(145deg, #E2DFE8 0%, #D8D5DC 55%, #CDC8D5 100%)",
-            }}
-          >
-            <div className="flex items-baseline gap-3 flex-wrap">
-              {originalPrice && (
-                <span className="text-base sm:text-lg text-slate-600 line-through font-medium">
-                  {formatBRL(originalPrice)}
-                </span>
-              )}
-              <span className="text-3xl sm:text-4xl font-extrabold text-slate-950 tracking-tight">
-                {formatBRL(currentPrice)}
-              </span>
-
-              {originalPrice && (
-                <span className="rounded-md bg-emerald-600/15 border border-emerald-700/30 px-2 py-0.5 text-xs font-bold text-emerald-900 shadow-xs">
-                  Economize {formatBRL(originalPrice - currentPrice)}
-                </span>
-              )}
-            </div>
-
-            {/* Aviso de Cashback */}
-            <div className="flex items-center gap-2 rounded-xl bg-white/70 border border-[#BDB6C8]/70 p-2.5 text-xs text-slate-800 shadow-xs">
-              <Sparkles className="h-4 w-4 text-purple-700 shrink-0" />
-              <span>
-                Ganhe <strong className="text-purple-950 font-bold">{formatBRL(cashbackEstimated)}</strong> (5% em cashback) ao receber seu pedido.
-              </span>
-            </div>
-          </div>
-
-          {/* Status do Estoque */}
-          <div className="flex items-center gap-2 text-xs">
-            <span
-              className={`h-2.5 w-2.5 rounded-full ${
-                !isOutOfStock ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" : "bg-rose-500"
-              }`}
-            />
-            {!isOutOfStock ? (
-              <span className="text-emerald-400 font-semibold">
-                Em estoque ({stock} unidades disponíveis para pronta entrega)
-              </span>
-            ) : (
-              <span className="text-rose-400 font-semibold">
-                Produto esgotado no momento para esta cidade
-              </span>
-            )}
-          </div>
-
-          {/* Descrição Completa do Produto */}
+          {/* 3. Descrição Completa e Características Relevantes */}
           {product.description && (
-            <div className="space-y-2 border-t border-border/40 pt-4">
+            <div className="space-y-1.5 border-t border-border/40 pt-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Descrição do Produto
               </h3>
@@ -409,53 +335,77 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
             </div>
           )}
 
-          {/* Controles de Quantidade e Subtotal */}
-          {!isOutOfStock && (
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-300">Quantidade:</span>
-                <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-card p-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={quantity <= 1}
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    aria-label="Diminuir quantidade"
-                    className="h-7 w-7 p-0 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </Button>
+          {/* 4. Seletor de Quantidade com o Valor Correspondente */}
+          {!isOutOfStock ? (
+            <div
+              className="rounded-2xl border border-[#BDB6C8]/80 p-4 sm:p-5 shadow-[0_8px_20px_rgba(16,16,24,0.12)] transition-colors duration-300"
+              style={{
+                background: "linear-gradient(145deg, #E2DFE8 0%, #D8D5DC 55%, #CDC8D5 100%)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-4">
+                {/* Seletor de Quantidade */}
+                <div className="flex items-center gap-2.5">
+                  <span className="text-xs font-bold text-slate-800">Quantidade:</span>
+                  <div className="flex items-center gap-1.5 rounded-xl border border-[#BDB6C8]/80 bg-white/80 p-1 shadow-xs">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={quantity <= 1}
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      aria-label="Diminuir quantidade"
+                      className="h-8 w-8 p-0 text-slate-800 hover:text-black hover:bg-slate-200/70 disabled:opacity-30 cursor-pointer"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
 
-                  <span className="min-w-8 text-center text-sm font-bold text-white">
-                    {quantity}
+                    <span className="min-w-8 text-center text-sm font-extrabold text-slate-950">
+                      {quantity}
+                    </span>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={quantity >= stock}
+                      onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
+                      aria-label="Aumentar quantidade"
+                      className="h-8 w-8 p-0 text-slate-800 hover:text-black hover:bg-slate-200/70 disabled:opacity-30 cursor-pointer"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Valor Correspondente Atualizado */}
+                <div className="text-right">
+                  {originalPrice && (
+                    <span className="block text-xs sm:text-sm text-slate-600 line-through font-medium">
+                      {formatBRL(originalPrice * quantity)}
+                    </span>
+                  )}
+                  <span className="text-2xl sm:text-3xl font-extrabold text-slate-950 tracking-tight">
+                    {formatBRL(subtotal)}
                   </span>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={quantity >= stock}
-                    onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
-                    aria-label="Aumentar quantidade"
-                    className="h-7 w-7 p-0 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-30"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
+                  {quantity > 1 && (
+                    <span className="block text-[11px] text-slate-600 font-medium">
+                      {formatBRL(currentPrice)} cada
+                    </span>
+                  )}
                 </div>
               </div>
-
-              <div className="flex items-center justify-between border-t border-slate-800/80 pt-2 text-xs">
-                <span className="text-muted-foreground">Subtotal do item:</span>
-                <strong className="text-base font-bold text-white">
-                  {formatBRL(subtotal)}
-                </strong>
-              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-center">
+              <span className="text-sm font-bold text-rose-400">
+                Produto esgotado no momento para esta cidade
+              </span>
             </div>
           )}
 
-          {/* Botões de Ação: Adicionar ao Carrinho e Comprar Agora */}
-          <div className="space-y-3 pt-2">
+          {/* 5. Botões de Ação: Adicionar ao Carrinho e Comprar Agora */}
+          <div className="space-y-3 pt-1">
             <div className="grid gap-3 sm:grid-cols-2">
               <Button
                 type="button"
