@@ -262,16 +262,16 @@ export function ProductCard({
           </div>
         )}
 
-        {/* Imagem do Produto: proporção padronizada, centralizada e integrada sem distorções ou cortes */}
+        {/* Imagem do Produto: proporção padronizada 1:1, centralizada e integrada sem distorções ou cortes */}
         <div className="relative z-10 flex h-full w-full items-center justify-center p-1 sm:p-2">
           {image ? (
             <img
               src={image}
               alt={product.name}
               loading="lazy"
-              width={600}
-              height={600}
-              className="h-full w-full max-h-[88%] max-w-[88%] object-contain object-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-105"
+              width={1080}
+              height={1080}
+              className="h-full w-full max-h-[90%] max-w-[90%] object-contain object-center drop-shadow-[0_12px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-105"
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-center px-2 text-xs sm:text-sm text-slate-700 font-medium">
