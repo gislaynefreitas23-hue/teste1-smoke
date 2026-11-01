@@ -33,7 +33,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import { formatBRL, TAXA_ENTREGA_CUIABA, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { formatBRL, resolveProductImage, TAXA_ENTREGA_CUIABA, WHATSAPP_NUMBER } from "@/lib/brasa";
+import { getTransparentPodAsset } from "@/lib/image-processing";
 import { buildWhatsAppUrl, openWhatsAppExternal } from "@/lib/whatsapp";
 import { useStoreSettings } from "@/lib/store-settings";
 import { useCart } from "@/lib/cart";
@@ -1556,13 +1557,16 @@ function CheckoutPage() {
             <div className="mt-4 max-h-60 overflow-y-auto space-y-3 pr-1">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
-                  <div className="flex-1 truncate">
-                    <p className="font-semibold text-white truncate">{item.name}</p>
-                    <p className="text-muted-foreground">
-                      {item.qty}x de {formatBRL(item.price)}
-                    </p>
+                  <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                    <CheckoutItemThumbnail id={item.id} name={item.name} imageUrl={item.imageUrl} />
+                    <div className="flex-1 truncate">
+                      <p className="font-semibold text-white truncate">{item.name}</p>
+                      <p className="text-muted-foreground">
+                        {item.qty}x de {formatBRL(item.price)}
+                      </p>
+                    </div>
                   </div>
-                  <span className="font-bold text-slate-200">
+                  <span className="font-bold text-slate-200 shrink-0">
                     {formatBRL(item.price * item.qty)}
                   </span>
                 </div>
@@ -1636,3 +1640,65 @@ function CheckoutPage() {
     </main>
   );
 }
+
+function CheckoutItemThumbnail({
+  id,
+  name,
+  imageUrl,
+}: {
+  id: string;
+  name: string;
+  imageUrl?: string;
+}) {
+  const [image, setImage] = useState<string | null>(() => {
+    return (
+      getTransparentPodAsset(id, imageUrl, name) ||
+      (imageUrl?.startsWith("data:") || imageUrl?.startsWith("blob:") || imageUrl?.startsWith("/assets/")
+        ? imageUrl
+        : null)
+    );
+  });
+
+  useEffect(() => {
+    let active = true;
+    const fast = getTransparentPodAsset(id, imageUrl, name);
+    if (fast) {
+      setImage(fast);
+      return;
+    }
+    if (imageUrl) {
+      resolveProductImage(imageUrl).then((url) => {
+        if (active && url) {
+          setImage(url);
+        } else if (active) {
+          const fallback = getTransparentPodAsset(id, null, name);
+          if (fallback) setImage(fallback);
+        }
+      });
+    } else {
+      const fallback = getTransparentPodAsset(id, null, name);
+      if (fallback) setImage(fallback);
+    }
+    return () => {
+      active = false;
+    };
+  }, [id, imageUrl, name]);
+
+  return (
+    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/80 p-0.5 flex items-center justify-center relative">
+      {image ? (
+        <img
+          src={image}
+          alt={name}
+          className="h-full w-full object-contain drop-shadow-xs"
+          loading="lazy"
+        />
+      ) : (
+        <div className="text-[9px] text-muted-foreground font-medium text-center">
+          {name.slice(0, 4)}
+        </div>
+      )}
+    </div>
+  );
+}
+

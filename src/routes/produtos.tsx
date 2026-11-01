@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useChildMatches } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Search } from "lucide-react";
 
@@ -31,15 +31,27 @@ export const Route = createFileRoute("/produtos")({
   component: Produtos,
 });
 
+function useSafeChildMatches() {
+  try {
+    return useChildMatches();
+  } catch {
+    return [];
+  }
+}
+
 function Produtos() {
+  const childMatches = useSafeChildMatches();
+  const hasChild = Boolean(childMatches && childMatches.length > 0);
+
   const { selectedCity, selectedCityId, openSelector } = useCity();
   const currentCity = selectedCityId || "cuiaba";
 
-  const { data: products = [], isLoading } = useQuery(productsQueryOptions(currentCity));
+  const { data: products = [], isLoading, isError, refetch } = useQuery(productsQueryOptions(currentCity));
   const [category, setCategory] = useState("Todos");
   const [searchQuery, setSearchQuery] = useState("");
 
   const categories = useMemo(() => {
+    if (hasChild) return ["Todos"];
     const set = new Set(products.map((p) => p.category).filter(Boolean));
     const sortedCategories = Array.from(set).sort((a, b) => {
       if ((a || "").toLowerCase().includes("pod")) return -1;
@@ -47,9 +59,10 @@ function Produtos() {
       return (a || "").localeCompare(b || "");
     });
     return ["Todos", ...sortedCategories];
-  }, [products]);
+  }, [hasChild, products]);
 
   const visible = useMemo(() => {
+    if (hasChild) return [];
     return products.filter((p) => {
       const matchCategory = category === "Todos" || p.category === category;
       const matchSearch =
@@ -59,7 +72,11 @@ function Produtos() {
         (p.description || "").toLowerCase().includes(searchQuery.toLowerCase());
       return matchCategory && matchSearch;
     });
-  }, [products, category, searchQuery]);
+  }, [hasChild, products, category, searchQuery]);
+
+  if (hasChild) {
+    return <Outlet />;
+  }
 
   return (
     <div
@@ -137,6 +154,18 @@ function Produtos() {
 
         {isLoading && products.length === 0 ? (
           <p className="mt-10 text-slate-700 font-medium text-center">Carregando catálogo da sua cidade...</p>
+        ) : isError && products.length === 0 ? (
+          <div className="mt-10 rounded-2xl border border-red-300/80 bg-white/80 p-8 text-center shadow-xs max-w-md mx-auto">
+            <p className="text-slate-800 font-semibold">Não foi possível carregar o catálogo no momento.</p>
+            <p className="mt-1 text-xs text-slate-600">Verifique sua conexão e tente novamente.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-4 rounded-xl bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-purple-800 transition-all cursor-pointer"
+            >
+              Tentar novamente
+            </button>
+          </div>
         ) : visible.length === 0 ? (
           <div className="mt-10 rounded-2xl border border-slate-300/80 bg-white/60 p-10 text-center shadow-xs">
             <p className="text-slate-700 font-medium">Nenhum produto encontrado nesta busca para esta cidade.</p>

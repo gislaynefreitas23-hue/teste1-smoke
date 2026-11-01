@@ -128,6 +128,10 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
   const handleAddToCart = () => {
     if (!product || isOutOfStock) return;
 
+    const durableImage =
+      getTransparentPodAsset(product.id, null, product.name) ||
+      (product.image_url && !product.image_url.startsWith("data:") ? product.image_url : undefined);
+
     const success = add(
       {
         id: product.id,
@@ -135,7 +139,7 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
         price: currentPrice,
         cityId: currentCity,
         stock,
-        imageUrl: product.image_url,
+        imageUrl: durableImage,
       },
       quantity
     );
@@ -149,6 +153,10 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
   const handleBuyNow = () => {
     if (!product || isOutOfStock) return;
 
+    const durableImage =
+      getTransparentPodAsset(product.id, null, product.name) ||
+      (product.image_url && !product.image_url.startsWith("data:") ? product.image_url : undefined);
+
     const success = add(
       {
         id: product.id,
@@ -156,7 +164,7 @@ export function ProductDetailPage({ productId: propProductId }: { productId?: st
         price: currentPrice,
         cityId: currentCity,
         stock,
-        imageUrl: product.image_url,
+        imageUrl: durableImage,
       },
       quantity
     );

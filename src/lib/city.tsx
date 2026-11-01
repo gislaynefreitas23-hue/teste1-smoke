@@ -60,13 +60,21 @@ type CityContextValue = {
 const CityContext = createContext<CityContextValue | null>(null);
 
 function readStoredCity(): CityId | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
   try {
-    const raw = localStorage.getItem(CITY_STORAGE_KEY);
+    const raw = window.localStorage.getItem(CITY_STORAGE_KEY);
     if (raw === "cuiaba" || raw === "sao-paulo") {
       return raw;
     }
+    // Remove chave corrompida ou valor inválido do storage
+    if (raw !== null) {
+      window.localStorage.removeItem(CITY_STORAGE_KEY);
+    }
     return null;
   } catch {
+    // Trata localStorage indisponível ou permissão negada
     return null;
   }
 }
@@ -74,17 +82,32 @@ function readStoredCity(): CityId | null {
 export function CityProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const safeCart = useSafeCart();
-  const [cityId, setCityId] = useState<CityId | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [cityId, setCityId] = useState<CityId | null>(() => readStoredCity());
+  const [isLoaded, setIsLoaded] = useState<boolean>(() => typeof window !== "undefined");
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [pendingDestination, setPendingDestination] = useState<string | null>(null);
   const [pendingCitySwitch, setPendingCitySwitch] = useState<CityId | null>(null);
 
   useEffect(() => {
+    // Sincroniza estado inicial após montagem e previne discrepâncias
     const stored = readStoredCity();
-    setCityId(stored);
+    if (stored !== cityId) {
+      setCityId(stored);
+    }
     setIsLoaded(true);
-  }, []);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === CITY_STORAGE_KEY) {
+        const next = readStoredCity();
+        setCityId(next);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [cityId]);
 
   const openSelector = useCallback((destination?: string) => {
     if (destination) {
@@ -102,10 +125,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
   const applyCitySelection = useCallback(
     (id: CityId) => {
       setCityId(id);
-      try {
-        localStorage.setItem(CITY_STORAGE_KEY, id);
-      } catch {
-        // storage unavailable
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(CITY_STORAGE_KEY, id);
+        } catch {
+          // storage unavailable
+        }
       }
       setIsSelectorOpen(false);
       setPendingCitySwitch(null);
@@ -146,10 +171,12 @@ export function CityProvider({ children }: { children: ReactNode }) {
 
   const clearCity = useCallback(() => {
     setCityId(null);
-    try {
-      localStorage.removeItem(CITY_STORAGE_KEY);
-    } catch {
-      // storage unavailable
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(CITY_STORAGE_KEY);
+      } catch {
+        // storage unavailable
+      }
     }
   }, []);
 

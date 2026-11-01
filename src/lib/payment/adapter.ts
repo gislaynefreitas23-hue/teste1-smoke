@@ -10,6 +10,18 @@ export function getPaymentProvider(method: PaymentMethod): PaymentProvider {
     return new DeliveryPaymentProvider();
   }
 
+  // No ambiente de homologação (staging), força estritamente o modo de testes sem cobranças reais
+  const isStaging =
+    (typeof process !== "undefined" &&
+      (process.env.VITE_APP_ENV === "staging" || process.env.APP_ENV === "staging")) ||
+    (typeof import.meta !== "undefined" &&
+      ((import.meta as any).env?.VITE_APP_ENV === "staging" ||
+        (import.meta as any).env?.MODE === "staging"));
+
+  if (isStaging) {
+    return new TestPaymentProvider();
+  }
+
   // Verifica se Mercado Pago está configurado no ambiente
   const mpToken =
     typeof process !== "undefined" ? process.env.MERCADO_PAGO_ACCESS_TOKEN : undefined;

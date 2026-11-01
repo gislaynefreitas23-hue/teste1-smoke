@@ -1,10 +1,26 @@
 import { WHATSAPP_NUMBER } from "./brasa";
 
+export const STAGING_DUMMY_PHONE = "5500000000000";
+
+function isStagingEnvironment(): boolean {
+  return (
+    (typeof process !== "undefined" &&
+      (process.env.VITE_APP_ENV === "staging" || process.env.APP_ENV === "staging")) ||
+    (typeof import.meta !== "undefined" &&
+      ((import.meta as any).env?.VITE_APP_ENV === "staging" ||
+        (import.meta as any).env?.MODE === "staging"))
+  );
+}
+
 /**
  * Normaliza o número de telefone para o formato internacional oficial exigido pelo WhatsApp (DDI + DDD + Número)
  * Exemplo: "(65) 99921-0066" -> "5565999210066"
  */
 export function formatWhatsAppNumber(phone?: string | null): string {
+  if (isStagingEnvironment() && (!phone || phone === WHATSAPP_NUMBER)) {
+    return STAGING_DUMMY_PHONE;
+  }
+
   const digits = (phone || WHATSAPP_NUMBER).replace(/\D/g, "");
   // Se já tiver 12 ou 13 dígitos e começar com 55 (ex: 5565999210066), retorna diretamente
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
@@ -46,6 +62,13 @@ export function isRunningInIframe(): boolean {
  */
 export function openWhatsAppExternal(url: string, e?: React.SyntheticEvent): void {
   if (typeof window === "undefined") return;
+
+  // No ambiente de homologação (staging), intercepta para impedir disparos reais ao WhatsApp
+  if (isStagingEnvironment()) {
+    if (e) e.preventDefault();
+    console.info("[STAGING SIMULATOR] Disparo externo do WhatsApp simulado com segurança (bloqueado para evitar envio a números reais). URL:", url);
+    return;
+  }
 
   // Se o evento estiver presente, podemos assegurar a abertura limpa
   try {

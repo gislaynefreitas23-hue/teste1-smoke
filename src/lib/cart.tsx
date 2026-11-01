@@ -47,6 +47,7 @@ export type CartContextValue = {
   lastAddedProduct: string | null;
   isNotificationVisible: boolean;
   dismissNotification: () => void;
+  isLoaded: boolean;
 };
 
 // Mantém o mesmo contexto entre recarregamentos do módulo (HMR), evitando que
@@ -101,8 +102,13 @@ function writeStoredCart(items: CartItem[]): void {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    if (typeof window !== "undefined") {
+      return readStoredCart();
+    }
+    return [];
+  });
+  const [isLoaded, setIsLoaded] = useState(() => typeof window !== "undefined");
 
   // Estado da notificação fixa inferior
   const [lastAddedProduct, setLastAddedProduct] = useState<string | null>(null);
@@ -146,8 +152,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // O carrinho vive no navegador: ler no primeiro render causaria divergência
   // entre o HTML do servidor e o do cliente.
   useEffect(() => {
-    setItems(readStoredCart());
-    setLoaded(true);
+    const stored = readStoredCart();
+    setItems(stored);
+    itemsRef.current = stored;
+    setIsLoaded(true);
   }, []);
 
   const itemsRef = useRef<CartItem[]>(items);
@@ -157,9 +165,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Persiste no localStorage sempre que os itens mudarem após a carga inicial
   useEffect(() => {
-    if (!loaded) return;
+    if (!isLoaded) return;
     writeStoredCart(items);
-  }, [items, loaded]);
+  }, [items, isLoaded]);
 
   // Sincroniza abas e componentes em tempo real quando o localStorage mudar
   useEffect(() => {
@@ -301,6 +309,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       lastAddedProduct,
       isNotificationVisible,
       dismissNotification,
+      isLoaded,
     }),
     [
       items,
@@ -314,6 +323,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       lastAddedProduct,
       isNotificationVisible,
       dismissNotification,
+      isLoaded,
     ],
   );
 
@@ -334,7 +344,7 @@ const FALLBACK_CART: CartContextValue = {
   items: [], add: () => false, setQty: noop, remove: noop, clear: noop,
   count: 0, subtotal: 0, cartCityId: null, cityConflictWarning: null,
   dismissCityConflictWarning: noop, lastAddedProduct: null,
-  isNotificationVisible: false, dismissNotification: noop,
+  isNotificationVisible: false, dismissNotification: noop, isLoaded: false,
 };
 
 export function useSafeCart() {

@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { CASHBACK_RATE, WHATSAPP_NUMBER, formatBRL, resolveProductImage } from "@/lib/brasa";
+import { getTransparentPodAsset } from "@/lib/image-processing";
 import { buildWhatsAppUrl, openWhatsAppExternal } from "@/lib/whatsapp";
 import { useCart, type CartItem } from "@/lib/cart";
 import { useCity } from "@/lib/city";
@@ -54,6 +55,7 @@ function Carrinho() {
     cartCityId,
     cityConflictWarning,
     dismissCityConflictWarning,
+    isLoaded,
   } = useCart();
   const { session } = useAuthSession();
   const { selectedCityId, openSelector } = useCity();
@@ -120,6 +122,15 @@ function Carrinho() {
     } finally {
       setSending(false);
     }
+  }
+
+  if (!isLoaded) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-20 text-center">
+        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="mt-4 text-sm text-muted-foreground">Carregando seu carrinho...</p>
+      </main>
+    );
   }
 
   if (items.length === 0) {
@@ -349,30 +360,52 @@ function CartItemRow({
   onSetQty: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
 }) {
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(() => {
+    return (
+      getTransparentPodAsset(item.id, item.imageUrl, item.name) ||
+      (item.imageUrl?.startsWith("data:") || item.imageUrl?.startsWith("blob:") || item.imageUrl?.startsWith("/assets/")
+        ? item.imageUrl
+        : null)
+    );
+  });
 
   useEffect(() => {
     let active = true;
+    const fastAsset = getTransparentPodAsset(item.id, item.imageUrl, item.name);
+    if (fastAsset) {
+      setImage(fastAsset);
+      return;
+    }
+
     if (item.imageUrl) {
       resolveProductImage(item.imageUrl).then((url) => {
-        if (active) setImage(url);
+        if (active && url) {
+          setImage(url);
+        } else if (active) {
+          const fallback = getTransparentPodAsset(item.id, null, item.name);
+          if (fallback) setImage(fallback);
+        }
       });
+    } else {
+      const fallback = getTransparentPodAsset(item.id, null, item.name);
+      if (fallback) setImage(fallback);
     }
+
     return () => {
       active = false;
     };
-  }, [item.imageUrl]);
+  }, [item.id, item.imageUrl, item.name]);
 
   return (
     <li className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5">
       <div className="flex items-center gap-3.5 min-w-0 flex-1">
         {/* Imagem do Produto */}
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted relative">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/80 bg-muted/60 relative flex items-center justify-center p-1">
           {image ? (
             <img
               src={image}
               alt={item.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain drop-shadow-sm"
               loading="lazy"
             />
           ) : (

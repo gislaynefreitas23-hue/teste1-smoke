@@ -152,6 +152,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       flavorDesc:
         "Fusão equilibrada de amoras silvestres e framboesas com toque refrescante de menta gelada e vapor denso.",
       imageUrl: auroraImg,
+      productId: "055e851d-e131-41c4-bbb5-6e358c2e719b",
+      buttonUrl: "/produtos/055e851d-e131-41c4-bbb5-6e358c2e719b",
       active: true,
       order: 1,
     },
@@ -164,6 +166,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       flavorDesc:
         "Notas cítricas marcantes de limão siciliano harmonizadas com frutas vermelhas selecionadas e vapor suave.",
       imageUrl: pinkLemonadeImg,
+      productId: "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
+      buttonUrl: "/produtos/be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
       active: true,
       order: 2,
     },
@@ -176,6 +180,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
       flavorDesc:
         "Perfil tropical exclusivo com nuances doces e tostadas de abacaxi maduro, proporcionando sabor encorpado.",
       imageUrl: toastedPineappleImg,
+      productId: "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
+      buttonUrl: "/produtos/9739d60d-33e4-4540-8d0b-2bdeda2cae86",
       active: true,
       order: 3,
     },
@@ -186,7 +192,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     "e8717cb6-9ceb-4997-9162-09e08fbefb41": "lancamento",
     "9739d60d-33e4-4540-8d0b-2bdeda2cae86": "lancamento",
     "1eeb97e8-5f52-48a4-9847-cd62daf9b37f": "lancamento",
-    "566e06a8-2051-40f7-90df-70b0a275a1ad": "lancamento",
+    "5ba5cdd1-7b6f-4486-81b1-90e30a5a9b5d": "lancamento", // Clear
+    "566e06a8-2051-40f7-90df-70b0a275a1ad": "lancamento", // Legado
     "9c924bf4-e909-470a-b4f2-3038cab03dd7": "lancamento",
   },
   productPromoPrices: {},
@@ -196,7 +203,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
     "e8717cb6-9ceb-4997-9162-09e08fbefb41", // Golden Berry
     "9739d60d-33e4-4540-8d0b-2bdeda2cae86", // Pineapple Toasted
     "1eeb97e8-5f52-48a4-9847-cd62daf9b37f", // Triple Berry
-    "566e06a8-2051-40f7-90df-70b0a275a1ad", // Clear
+    "566e06a8-2051-40f7-90df-70b0a275a1ad", // Clear (legado)
+    "5ba5cdd1-7b6f-4486-81b1-90e30a5a9b5d", // Clear (oficial)
   ],
   catalogSettings: {
     showShortDescription: true,
@@ -327,26 +335,7 @@ export async function fetchRemoteStoreSettings(force = false): Promise<StoreSett
         }
       }
 
-      // Tenta tabela store_settings dedicada
-      try {
-        const { data, error } = await (supabase as any)
-          .from("store_settings")
-          .select("value")
-          .eq("key", "general")
-          .maybeSingle();
-
-        if (!error && data && (data as any).value) {
-          const merged: StoreSettings = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
-          sharedSettingsCache = merged;
-          lastFetchTime = Date.now();
-          saveStoreSettingsLocally(merged);
-          return merged;
-        }
-      } catch {
-        // fallback
-      }
-
-      // Fallback: registro de sistema na tabela products
+      // 1. Fonte ativa oficial: registro de configurações na tabela products (_system_settings)
       try {
         const query = supabase.from("products").select("description");
         if (typeof (query as any)?.eq === "function") {
@@ -379,6 +368,7 @@ export async function fetchRemoteStoreSettings(force = false): Promise<StoreSett
               },
               productVariations: parsed.productVariations || {},
               productShortDescriptions: parsed.productShortDescriptions || {},
+              cityInventories: parsed.cityInventories || {},
             };
             sharedSettingsCache = merged;
             lastFetchTime = Date.now();
@@ -387,7 +377,26 @@ export async function fetchRemoteStoreSettings(force = false): Promise<StoreSett
           }
         }
       } catch {
-        // Fallback silencioso
+        // continua para fallback
+      }
+
+      // 2. Fallback defensivo de compatibilidade: tabela store_settings dedicada
+      try {
+        const { data, error } = await (supabase as any)
+          .from("store_settings")
+          .select("value")
+          .eq("key", "general")
+          .maybeSingle();
+
+        if (!error && data && (data as any).value) {
+          const merged: StoreSettings = { ...DEFAULT_STORE_SETTINGS, ...(data as any).value };
+          sharedSettingsCache = merged;
+          lastFetchTime = Date.now();
+          saveStoreSettingsLocally(merged);
+          return merged;
+        }
+      } catch {
+        // fallback silencioso
       }
 
       return sharedSettingsCache || getStoreSettings();
@@ -409,20 +418,9 @@ export async function saveStoreSettings(settings: StoreSettings): Promise<void> 
   // Sincronização com Supabase (com timeout defensivo para garantir alta disponibilidade mesmo offline)
   try {
     const syncRemote = async () => {
-      try {
-        const table = (supabase as any).from("store_settings");
-        if (typeof table?.upsert === "function") {
-          const { error: dedicatedError } = await table.upsert({
-            key: "general",
-            value: settings,
-            updated_at: new Date().toISOString(),
-          });
-          if (!dedicatedError) return;
-        }
-      } catch {
-        // continua para fallback
-      }
+      let savedToProducts = false;
 
+      // 1. Gravação prioritária na fonte ativa oficial: tabela products (_system_settings)
       try {
         const selectQuery = supabase.from("products").select("id");
         let existingRow: { id: string } | null = null;
@@ -446,12 +444,31 @@ export async function saveStoreSettings(settings: StoreSettings): Promise<void> 
         };
 
         if (existingRow?.id) {
-          await supabase.from("products").update(payload).eq("id", existingRow.id);
+          const { error } = await supabase.from("products").update(payload).eq("id", existingRow.id);
+          if (!error) savedToProducts = true;
         } else {
-          await supabase.from("products").insert(payload);
+          const { error } = await supabase.from("products").insert(payload);
+          if (!error) savedToProducts = true;
         }
       } catch {
         // Fallback silencioso
+      }
+
+      // Se gravou com sucesso no registro oficial de produtos, não dispara requisição à tabela inexistente
+      if (savedToProducts) return;
+
+      // 2. Fallback defensivo de compatibilidade: tabela store_settings dedicada
+      try {
+        const table = (supabase as any).from("store_settings");
+        if (typeof table?.upsert === "function") {
+          await table.upsert({
+            key: "general",
+            value: settings,
+            updated_at: new Date().toISOString(),
+          });
+        }
+      } catch {
+        // continua para fallback
       }
     };
 

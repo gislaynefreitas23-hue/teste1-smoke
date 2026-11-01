@@ -17,10 +17,12 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
   "e8717cb6-9ceb-4997-9162-09e08fbefb41": goldenBerryImg,
   "9739d60d-33e4-4540-8d0b-2bdeda2cae86": pineappleToastedImg,
   "1eeb97e8-5f52-48a4-9847-cd62daf9b37f": tripleBerryImg,
-  "566e06a8-2051-40f7-90df-70b0a275a1ad": clearImg,
+  "5ba5cdd1-7b6f-4486-81b1-90e30a5a9b5d": clearImg, // ID Oficial do Clear
+  "566e06a8-2051-40f7-90df-70b0a275a1ad": clearImg, // Compatibilidade legado
   "9c924bf4-e909-470a-b4f2-3038cab03dd7": fckingFabImg,
 
   // Por nome de arquivo do Supabase Storage
+  "banners-1792350811460-j7tyf7.png": auroraBerriesImg,
   "catalog-1792350992493-3eqo0x.png": auroraBerriesImg,
   "produto-1792213432848-3famu6.png": pinkLemonadeImg,
   "catalog-1792351173512-sx962r.png": goldenBerryImg,
@@ -46,6 +48,7 @@ export const POD_TRANSPARENT_ASSETS: Record<string, string> = {
 };
 
 export const ORIGINAL_SEEDED_STORAGE_FILES: Record<string, string> = {
+  "banners-1792350811460-j7tyf7.png": auroraBerriesImg,
   "catalog-1792350992493-3eqo0x.png": auroraBerriesImg,
   "produto-1792213432848-3famu6.png": pinkLemonadeImg,
   "catalog-1792351173512-sx962r.png": goldenBerryImg,
@@ -73,16 +76,21 @@ export function isCustomUserImage(imageUrl?: string | null): boolean {
   const trimmed = imageUrl.trim();
   if (!trimmed) return false;
 
-  // Se já for data URL base64 ou blob (upload direto do computador)
-  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
-    return true;
-  }
-
-  // Se corresponder a um dos 6 arquivos originais do catálogo inicial
+  // Se corresponder ao arquivo do banner Aurora Berries ou arquivos seed originais
   for (const seededFile of Object.keys(ORIGINAL_SEEDED_STORAGE_FILES)) {
     if (trimmed.includes(seededFile)) {
       return false;
     }
+  }
+
+  // Se for a string base64 herdada do Clear, não é custom (utiliza o seed oficial transparente)
+  if (trimmed.startsWith("data:") && trimmed.includes("Aey9CbxtSVkf")) {
+    return false;
+  }
+
+  // Se já for data URL base64 ou blob (upload direto do computador)
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+    return true;
   }
 
   // Se for um dos assets transparentes locais importados
@@ -108,6 +116,20 @@ export function getTransparentPodAsset(
   // 1. Se o usuário definiu uma foto customizada nova, NÃO sobrepõe com asset estático
   if (isCustomUserImage(imageUrl)) {
     return null;
+  }
+
+  // 2. Banner Aurora Berries: garante resolução ao asset aprovado com transparência real
+  if (imageUrl && imageUrl.includes("banners-1792350811460-j7tyf7.png")) {
+    return auroraBerriesImg;
+  }
+
+  // 3. Pod Clear: garante resolução ao asset oficial transparente pelo ID oficial ou título
+  if (
+    productId === "5ba5cdd1-7b6f-4486-81b1-90e30a5a9b5d" ||
+    productId === "566e06a8-2051-40f7-90df-70b0a275a1ad" ||
+    (name && name.toLowerCase().includes("clear") && name.toLowerCase().includes("ebcreate"))
+  ) {
+    return clearImg;
   }
 
   // 2. Se a imagem apontar para um dos arquivos originais do seed do Supabase

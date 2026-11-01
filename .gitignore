@@ -30,3 +30,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Staging & Homologation files (Never commit to production / Lovable)
+.env.staging
+.env.staging.*
+scripts/
+drizzle/staging_schema_setup.sql
+*.pdf
+

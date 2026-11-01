@@ -6,6 +6,7 @@ import {
 } from "@/lib/image-processing";
 import { ProductImage } from "@/components/ProductImage";
 import { DEFAULT_STORE_SETTINGS } from "@/lib/store-settings";
+import { resolveProductImage } from "@/lib/brasa";
 
 describe("Correção Definitiva da Exibição de Imagens — Pantanal Smoke", () => {
   it("1. Mapeia com precisão os 6 pods EBCREATE BC Pro 40K para ativos com transparência de alta resolução", () => {
@@ -125,5 +126,40 @@ describe("Correção Definitiva da Exibição de Imagens — Pantanal Smoke", ()
     expect(
       getTransparentPodAsset(clearId, "https://storage.pantanal.com/novo-clear.webp", clearName)
     ).toBeNull();
+  });
+
+  it("6. resolveProductImage preserva caminhos locais do Vite em dev e prod sem requisição ao Storage", async () => {
+    // Vite dev mode (/src/assets/...)
+    const devAurora = await resolveProductImage("/src/assets/banner-aurora-berries.png");
+    expect(devAurora).toBe("/src/assets/banner-aurora-berries.png");
+
+    const devPink = await resolveProductImage("/src/assets/banner-pink-lemonade.png");
+    expect(devPink).toBe("/src/assets/banner-pink-lemonade.png");
+
+    const devPineapple = await resolveProductImage("/src/assets/banner-toasted-pineapple.png");
+    expect(devPineapple).toBe("/src/assets/banner-toasted-pineapple.png");
+
+    // Vite build / produção (/assets/...)
+    const prodAurora = await resolveProductImage("/assets/banner-aurora-berries-B86Cnv9t.png");
+    expect(prodAurora).toBe("/assets/banner-aurora-berries-B86Cnv9t.png");
+
+    const prodPink = await resolveProductImage("/assets/banner-pink-lemonade-abc123.png");
+    expect(prodPink).toBe("/assets/banner-pink-lemonade-abc123.png");
+
+    const prodPineapple = await resolveProductImage("/assets/banner-toasted-pineapple-xyz456.png");
+    expect(prodPineapple).toBe("/assets/banner-toasted-pineapple-xyz456.png");
+
+    // Outros caminhos relativos ou públicos locais
+    expect(await resolveProductImage("/images/pod.png")).toBe("/images/pod.png");
+    expect(await resolveProductImage("./assets/banner.png")).toBe("./assets/banner.png");
+    expect(await resolveProductImage("assets/banner.png")).toBe("assets/banner.png");
+
+    // Data URLs e Blobs
+    expect(await resolveProductImage("data:image/png;base64,abc")).toBe("data:image/png;base64,abc");
+    expect(await resolveProductImage("blob:http://localhost:8080/uuid")).toBe("blob:http://localhost:8080/uuid");
+
+    // Falsy / Nulos
+    expect(await resolveProductImage("")).toBeNull();
+    expect(await resolveProductImage("   ")).toBeNull();
   });
 });

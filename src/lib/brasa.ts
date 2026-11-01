@@ -262,17 +262,34 @@ export const DEFAULT_CATALOG_FALLBACK: Product[] = [
 ];
 
 export function getLocalCachedProducts(cityId: string): Product[] {
-  if (typeof window === "undefined") return DEFAULT_CATALOG_FALLBACK;
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(`ps_products_cache_${cityId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Garante isolamento estrito por cidade: nunca exibe produtos de outra cidade
+        return parsed.filter((p) => !p.city_id || p.city_id === cityId);
+      }
+    }
+  } catch {
+    // ignora erro de storage
+  }
+  return [];
+}
+
+export function getLocalCacheTimestamp(cityId: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(`ps_products_cache_time_${cityId}`);
+    if (raw) {
+      const ts = Number(raw);
+      if (!isNaN(ts) && ts > 0) return ts;
     }
   } catch {
     // ignora
   }
-  return DEFAULT_CATALOG_FALLBACK;
+  return 0;
 }
 
 /** Catálogo público: só produtos ativos e disponíveis na cidade selecionada. */
@@ -284,6 +301,13 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
     staleTime: 1000 * 60 * 5, // 5 minutos (otimização Lovable Cloud)
     gcTime: 1000 * 60 * 30, // 30 minutos em cache de memória
     refetchOnWindowFocus: false, // Evita refetch ao trocar abas no mobile; atualizações são coordenadas via Supabase Realtime
+    initialData: () => {
+      const cached = getLocalCachedProducts(targetCity);
+      return cached.length > 0 ? cached : undefined;
+    },
+    initialDataUpdatedAt: () => {
+      return getLocalCacheTimestamp(targetCity);
+    },
     queryFn: async (): Promise<Product[]> => {
       let rawProducts: any[] = [];
 
@@ -444,6 +468,7 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
       if (typeof window !== "undefined" && enrichedList.length > 0) {
         try {
           localStorage.setItem(`ps_products_cache_${targetCity}`, JSON.stringify(enrichedList));
+          localStorage.setItem(`ps_products_cache_time_${targetCity}`, String(Date.now()));
         } catch {
           // ignora erro de quota do storage
         }
@@ -459,18 +484,21 @@ export function productsQueryOptions(cityId?: "cuiaba" | "sao-paulo" | null) {
  * do espaço de armazenamento privado, que precisa de uma URL assinada.
  */
 export async function resolveProductImage(imageUrl: string): Promise<string | null> {
-  if (!imageUrl) return null;
-  if (imageUrl.startsWith("data:")) return imageUrl;
+  if (!imageUrl || typeof imageUrl !== "string") return null;
+  const trimmed = imageUrl.trim();
+  if (!trimmed) return null;
 
-  // Se for uma URL do Supabase Storage no bucket products ou caminho relativo
-  const supabaseStorageMatch = imageUrl.match(
+  // 1. Data URLs e Blobs locais em memória
+  if (trimmed.startsWith("data:") || trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
+
+  // 2. URLs do Supabase Storage no bucket 'products'
+  const supabaseStorageMatch = trimmed.match(
     /\/storage\/v1\/object\/(?:public|sign|authenticated)\/products\/([^?]+)/
   );
-  const storagePath = supabaseStorageMatch
-    ? decodeURIComponent(supabaseStorageMatch[1])
-    : (!imageUrl.startsWith("http") ? imageUrl : null);
-
-  if (storagePath) {
+  if (supabaseStorageMatch) {
+    const storagePath = decodeURIComponent(supabaseStorageMatch[1]);
     try {
       const { data, error } = await supabase.storage
         .from("products")
@@ -482,9 +510,48 @@ export async function resolveProductImage(imageUrl: string): Promise<string | nu
     } catch {
       // continua para fallback
     }
+    // Fallback: se for URL absoluta do Supabase, retorna a própria URL
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
   }
 
-  if (/^https?:\/\//i.test(imageUrl)) return imageUrl;
+  // 3. Imagens locais, estáticas, empacotadas pelo Vite ou públicas
+  // Cobre desenvolvimento (/src/assets, /@fs/), produção (/assets/...) e públicos (/...)
+  const isLocalAsset =
+    trimmed.startsWith("/") ||
+    trimmed.startsWith("./") ||
+    trimmed.startsWith("../") ||
+    trimmed.startsWith("src/") ||
+    trimmed.startsWith("@/") ||
+    trimmed.startsWith("assets/") ||
+    trimmed.includes("/assets/") ||
+    trimmed.includes("/@fs/");
+
+  if (isLocalAsset) {
+    return trimmed;
+  }
+
+  // 4. Caminho de objeto no Supabase Storage (sem URL completa, ex: "catalog-123.webp")
+  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+    try {
+      const cleanPath = trimmed.replace(/^products\//, "");
+      const { data, error } = await supabase.storage
+        .from("products")
+        .createSignedUrl(cleanPath, 60 * 60 * 24 * 365 * 5);
+
+      if (!error && data?.signedUrl) {
+        return data.signedUrl;
+      }
+    } catch {
+      // continua para fallback
+    }
+  }
+
+  // 5. URLs externas absolutas (HTTP/HTTPS)
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
 
   return null;
 }
@@ -501,6 +568,13 @@ export function singleProductQueryOptions(productId: string, cityId?: "cuiaba" |
     staleTime: 1000 * 60 * 5, // 5 minutos
     gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
+    initialData: () => {
+      const cached = getLocalCachedProducts(targetCity).find((prod) => prod.id === productId);
+      return cached || undefined;
+    },
+    initialDataUpdatedAt: () => {
+      return getLocalCacheTimestamp(targetCity);
+    },
     queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
 

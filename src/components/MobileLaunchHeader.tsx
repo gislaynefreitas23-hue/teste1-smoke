@@ -36,17 +36,14 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
 
   const browserPath = typeof window !== "undefined" ? window.location.pathname : "";
 
-  // Não renderiza em páginas de checkout, no painel admin ou na página de produtos (/produtos)
-  if (
+  // Determina se deve ocultar em páginas de checkout, no painel admin ou na página de produtos (/produtos)
+  const isHiddenRoute =
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/produtos") ||
     browserPath.startsWith("/checkout") ||
     browserPath.startsWith("/admin") ||
-    browserPath.startsWith("/produtos")
-  ) {
-    return null;
-  }
+    browserPath.startsWith("/produtos");
 
   const activeBanners = settings.banners
     .filter((b) => b.active)
@@ -179,6 +176,10 @@ export function MobileLaunchHeader({ className = "" }: { className?: string }) {
       active = false;
     };
   }, [activeSlide.productId, activeSlide.image, activeSlide.name]);
+
+  if (isHiddenRoute) {
+    return null;
+  }
 
   return (
     <div

@@ -269,4 +269,31 @@ describe("Separação Completa Multicidade: Cuiabá e São Paulo", () => {
     expect(summarySP.deliveryFee).toBe(0.0);
     expect(summarySP.total).toBe(89.8);
   });
+
+  it("7. Inicializa cidade de forma imediata e segura sem consultas redundantes a Cuiabá quando São Paulo está salva", () => {
+    // 7.1 São Paulo salva no localStorage
+    localStorage.setItem(CITY_STORAGE_KEY, "sao-paulo");
+    const { result: spResult } = renderHook(() => useCity(), {
+      wrapper: ({ children }) => <CityProvider>{children}</CityProvider>,
+    });
+    expect(spResult.current.selectedCityId).toBe("sao-paulo");
+    expect(spResult.current.selectedCity?.name).toBe("São Paulo");
+    expect(spResult.current.isLoaded).toBe(true);
+
+    // 7.2 Valor inválido ou corrompido é tratado e expurgado
+    localStorage.setItem(CITY_STORAGE_KEY, "cidade-invalida");
+    const { result: invalidResult } = renderHook(() => useCity(), {
+      wrapper: ({ children }) => <CityProvider>{children}</CityProvider>,
+    });
+    expect(invalidResult.current.selectedCityId).toBeNull();
+    expect(localStorage.getItem(CITY_STORAGE_KEY)).toBeNull();
+
+    // 7.3 Cuiabá salvo
+    localStorage.setItem(CITY_STORAGE_KEY, "cuiaba");
+    const { result: cbResult } = renderHook(() => useCity(), {
+      wrapper: ({ children }) => <CityProvider>{children}</CityProvider>,
+    });
+    expect(cbResult.current.selectedCityId).toBe("cuiaba");
+    expect(cbResult.current.selectedCity?.name).toBe("Cuiabá");
+  });
 });

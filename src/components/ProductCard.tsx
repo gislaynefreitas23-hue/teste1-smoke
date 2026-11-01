@@ -361,13 +361,16 @@ export function ProductCard({
             }`}
             onClick={(e) => {
               e.stopPropagation();
+              const durableImage =
+                getTransparentPodAsset(product.id, null, product.name) ||
+                (product.image_url && !product.image_url.startsWith("data:") ? product.image_url : undefined);
               add({
                 id: product.id,
                 name: product.name,
                 price: currentPrice,
                 cityId: targetCity,
                 stock,
-                imageUrl: product.image_url,
+                imageUrl: durableImage,
               });
             }}
             aria-label={`Adicionar ${product.name} ao carrinho`}

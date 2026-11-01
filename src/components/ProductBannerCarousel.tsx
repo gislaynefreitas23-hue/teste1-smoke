@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, Sparkles, Zap, Gauge, ArrowRight } from "lucide-react";
 
 import imgAurora from "@/assets/banner-aurora-berries.png";
@@ -20,7 +21,7 @@ export const POD_PRODUCT_IDS: Record<string, string> = {
   "Pineapple Toasted": "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
   "Golden Berry": "e8717cb6-9ceb-4997-9162-09e08fbefb41",
   "Triple Berry": "1eeb97e8-5f52-48a4-9847-cd62daf9b37f",
-  "Clear": "566e06a8-2051-40f7-90df-70b0a275a1ad",
+  "Clear": "5ba5cdd1-7b6f-4486-81b1-90e30a5a9b5d",
   "F*cking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
   "F**king Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
   "Fcking Fab": "9c924bf4-e909-470a-b4f2-3038cab03dd7",
@@ -29,6 +30,52 @@ export const POD_PRODUCT_IDS: Record<string, string> = {
   "Sour Apple Ice": "06d6bbb2-7bdb-41e2-a822-d6ee17f5dc56",
   "Blue Razz Ice": "e9cea634-18df-4035-a943-20b748a547fa",
 };
+
+function SafeBannerLink({
+  to,
+  children,
+  className,
+  "aria-label": ariaLabel,
+}: {
+  to: string;
+  children: React.ReactNode;
+  className?: string;
+  "aria-label"?: string;
+}) {
+  let navigate: any = null;
+  try {
+    navigate = useNavigate();
+  } catch {
+    // fora de RouterProvider (ex: testes unitários isolados)
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (
+      navigate &&
+      to &&
+      !to.startsWith("http") &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.shiftKey &&
+      !e.altKey &&
+      e.button === 0
+    ) {
+      e.preventDefault();
+      navigate({ to: to as any });
+    }
+  };
+
+  return (
+    <a
+      href={to}
+      onClick={handleClick}
+      className={className}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </a>
+  );
+}
 
 export function CarouselSlideImage({
   imageUrl,
@@ -115,10 +162,12 @@ export type SlideItem = {
 export const SLIDES: SlideItem[] = [
   {
     id: 1,
+    productId: "055e851d-e131-41c4-bbb5-6e358c2e719b",
     name: "Aurora Berries",
     puffs: "40.000 PUFFS",
     image: imgAurora,
     subtitle: "Série Especial Turbo",
+    buttonUrl: "/produtos/055e851d-e131-41c4-bbb5-6e358c2e719b",
     footerPhrase: "Consistência de Sabor de Alta Performance",
     flavorDesc:
       "Fusão equilibrada de amoras silvestres e framboesas com toque refrescante de menta gelada e vapor denso.",
@@ -127,10 +176,12 @@ export const SLIDES: SlideItem[] = [
   },
   {
     id: 2,
+    productId: "be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
     name: "Pink Lemonade",
     puffs: "40.000 PUFFS",
     image: imgPinkLemonade,
     subtitle: "Série Especial Turbo",
+    buttonUrl: "/produtos/be4c4ce8-cd8f-4a71-97ef-b6c0775505ff",
     footerPhrase: "Gerenciamento de Potência e Autonomia Estendida",
     flavorDesc:
       "Notas cítricas marcantes de limão siciliano harmonizadas com frutas vermelhas selecionadas e vapor suave.",
@@ -139,10 +190,12 @@ export const SLIDES: SlideItem[] = [
   },
   {
     id: 3,
+    productId: "9739d60d-33e4-4540-8d0b-2bdeda2cae86",
     name: "Toasted Pineapple",
     puffs: "40.000 PUFFS",
     image: imgToastedPineapple,
     subtitle: "Série Especial Turbo",
+    buttonUrl: "/produtos/9739d60d-33e4-4540-8d0b-2bdeda2cae86",
     footerPhrase: "Design Funcional com Visibilidade de Essência",
     flavorDesc:
       "Perfil tropical exclusivo com nuances doces e tostadas de abacaxi maduro, proporcionando sabor encorpado.",
@@ -161,6 +214,7 @@ export function ProductBannerCarousel({
   const { settings } = useStoreSettings();
   const [current, setCurrent] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [expandedSlide, setExpandedSlide] = useState<number | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const touchEndXRef = useRef<number | null>(null);
 
@@ -179,8 +233,8 @@ export function ProductBannerCarousel({
             POD_PRODUCT_IDS[shortTitle] ||
             (cleanTitle.toLowerCase().includes("fab") ? "9c924bf4-e909-470a-b4f2-3038cab03dd7" : undefined);
 
-          const fallbackImage =
-            getTransparentPodAsset(matchedProdId, null, b.title) ||
+          const transparentAsset =
+            getTransparentPodAsset(matchedProdId, b.imageUrl, b.title) ||
             (SLIDES[idx]?.name.toLowerCase() === cleanTitle.toLowerCase() ? SLIDES[idx]?.image : "");
 
           return {
@@ -188,7 +242,7 @@ export function ProductBannerCarousel({
             productId: matchedProdId,
             name: b.title,
             puffs: b.puffs,
-            image: b.imageUrl || fallbackImage || "",
+            image: transparentAsset || b.imageUrl || "",
             subtitle: b.subtitle || "Série Especial Turbo",
             buttonText: b.buttonText,
             buttonUrl: b.buttonUrl || (matchedProdId ? `/produtos/${matchedProdId}` : "/produtos"),
@@ -214,10 +268,12 @@ export function ProductBannerCarousel({
 
   const nextSlide = useCallback(() => {
     setCurrent((prev) => (prev + 1) % totalSlides);
+    setExpandedSlide(null);
   }, [totalSlides]);
 
   const prevSlide = useCallback(() => {
     setCurrent((prev) => (prev - 1 + totalSlides) % totalSlides);
+    setExpandedSlide(null);
   }, [totalSlides]);
 
   // Transição automática a cada 5 segundos (5000ms)
@@ -380,8 +436,8 @@ export function ProductBannerCarousel({
                   <div className="flex flex-row md:grid md:grid-cols-12 items-center gap-2 sm:gap-6">
                     {/* Lateral Esquerda no mobile: Imagem aumentada com inclinação de 15° no sentido horário */}
                     <div className="shrink-0 w-28 min-[400px]:w-32 sm:w-36 md:w-auto md:max-w-none md:order-2 md:col-span-5 lg:col-span-4 flex items-center justify-center">
-                      <a
-                        href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
+                      <SafeBannerLink
+                        to={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
                         className="group/img relative flex w-full h-28 min-[400px]:h-32 sm:h-36 md:h-72 items-center justify-center cursor-pointer"
                         aria-label={`Ver detalhes de ${slide.name}`}
                       >
@@ -401,7 +457,7 @@ export function ProductBannerCarousel({
                             productName={slide.name}
                           />
                         </div>
-                      </a>
+                      </SafeBannerLink>
                     </div>
 
                     {/* Lateral Direita no mobile: Título, Descrição e Botão organizados no mesmo card */}
@@ -416,15 +472,37 @@ export function ProductBannerCarousel({
                         >
                           {slide.name}
                         </h2>
-                        <p
-                          className={`mt-0.5 font-medium text-[#4A4652] line-clamp-2 leading-snug ${
-                            compact
-                              ? "max-w-lg text-[9.5px] sm:text-xs"
-                              : "max-w-xl text-[10px] sm:text-xs md:text-base sm:leading-relaxed"
-                          }`}
-                        >
-                          {slide.flavorDesc}
-                        </p>
+                        {(() => {
+                          const isExpanded = expandedSlide === slide.id;
+                          const hasLongDesc = Boolean(slide.flavorDesc && slide.flavorDesc.length > 65);
+                          return (
+                            <p
+                              className={`mt-0.5 font-medium text-[#4A4652] leading-snug transition-all duration-200 ${
+                                isExpanded ? "line-clamp-none" : "line-clamp-2 md:line-clamp-none"
+                              } ${
+                                compact
+                                  ? "max-w-lg text-[9.5px] sm:text-xs"
+                                  : "max-w-xl text-[10px] sm:text-xs md:text-base sm:leading-relaxed"
+                              }`}
+                            >
+                              {slide.flavorDesc}
+                              {hasLongDesc && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedSlide(isExpanded ? null : slide.id);
+                                  }}
+                                  className="md:hidden inline-flex items-center ml-1 text-[9px] min-[360px]:text-[10px] font-bold text-[#A84CFF] hover:underline cursor-pointer align-baseline"
+                                  aria-expanded={isExpanded}
+                                  aria-label={isExpanded ? "Ocultar detalhes da descrição" : "Ler descrição completa"}
+                                >
+                                  {isExpanded ? "Ver menos" : "Ver mais"}
+                                </button>
+                              )}
+                            </p>
+                          );
+                        })()}
                       </div>
 
                       {/* Recursos e Performance */}
@@ -454,8 +532,8 @@ export function ProductBannerCarousel({
 
                       {/* Botão de ação direta para o produto */}
                       <div className="pt-0.5 flex items-center gap-2">
-                        <a
-                          href={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
+                        <SafeBannerLink
+                          to={slide.buttonUrl || (slide.productId ? `/produtos/${slide.productId}` : "/produtos")}
                           aria-label={`Conheça o lançamento ${slide.name}`}
                           className={`inline-flex items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-[#A84CFF] to-[#7E22CE] font-bold text-white shadow-[0_3px_10px_rgba(168,76,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_5px_16px_rgba(168,76,255,0.5)] cursor-pointer whitespace-nowrap w-fit max-w-full ${
                             compact
@@ -467,7 +545,7 @@ export function ProductBannerCarousel({
                           <span className="inline md:hidden">{slide.buttonText || "Conferir novidade"}</span>
                           <span className="hidden md:inline">{slide.buttonText || "Conheça o lançamento"}</span>
                           <ArrowRight className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
-                        </a>
+                        </SafeBannerLink>
                       </div>
                     </div>
                   </div>
