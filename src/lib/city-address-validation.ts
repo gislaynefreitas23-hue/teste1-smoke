@@ -11,6 +11,7 @@ export interface AddressValidationInput {
   cep?: string | null;
   state?: string | null;
   rua?: string | null;
+  numero?: string | null;
   bairro?: string | null;
 }
 

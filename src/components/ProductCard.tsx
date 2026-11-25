@@ -134,7 +134,7 @@ export function ProductCard({
   cityId,
 }: {
   product: Product;
-  cityId?: string;
+  cityId?: "cuiaba" | "sao-paulo";
 }) {
   const navigate = useNavigate();
   const { add } = useCart();
